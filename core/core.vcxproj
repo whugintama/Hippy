@@ -26,10 +26,6 @@
     <ClInclude Include="include\core\base\js_value_wrapper.h" />
     <ClInclude Include="include\core\base\macros.h" />
     <ClInclude Include="include\core\base\string_view_utils.h" />
-    <ClInclude Include="include\core\base\task.h" />
-    <ClInclude Include="include\core\base\task_runner.h" />
-    <ClInclude Include="include\core\base\thread.h" />
-    <ClInclude Include="include\core\base\thread_id.h" />
     <ClInclude Include="include\core\base\uri_loader.h" />
     <ClInclude Include="include\core\core.h" />
     <ClInclude Include="include\core\engine.h" />
@@ -46,20 +42,23 @@
     <ClInclude Include="include\core\napi\native_source_code.h" />
     <ClInclude Include="include\core\napi\v8\js_native_api_v8.h" />
     <ClInclude Include="include\core\scope.h" />
-    <ClInclude Include="include\core\task\common_task.h" />
-    <ClInclude Include="include\core\task\javascript_task.h" />
-    <ClInclude Include="include\core\task\javascript_task_runner.h" />
-    <ClInclude Include="include\core\task\worker_task_runner.h" />
     <ClInclude Include="third_party\base\include\base\logging.h" />
     <ClInclude Include="third_party\base\include\base\log_level.h" />
     <ClInclude Include="third_party\base\include\base\log_settings.h" />
     <ClInclude Include="third_party\base\include\base\macros.h" />
+    <ClInclude Include="third_party\base\include\base\scheduler.h" />
+    <ClInclude Include="third_party\base\include\base\task.h" />
+    <ClInclude Include="third_party\base\include\base\task_runner.h" />
+    <ClInclude Include="third_party\base\include\base\thread.h" />
+    <ClInclude Include="third_party\base\include\base\time_delta.h" />
+    <ClInclude Include="third_party\base\include\base\time_point.h" />
     <ClInclude Include="third_party\base\include\base\unicode_string_view.h" />
+    <ClInclude Include="third_party\base\include\base\worker.h" />
+    <ClInclude Include="third_party\base\include\base\worker_pool.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\base\file.cc" />
     <ClCompile Include="src\base\js_value_wrapper.cc" />
-    <ClCompile Include="src\base\task.cc" />
     <ClCompile Include="src\base\task_runner.cc" />
     <ClCompile Include="src\base\thread.cc" />
     <ClCompile Include="src\base\thread_id.cc" />
@@ -72,14 +71,15 @@
     <ClCompile Include="src\napi\v8\js_native_api_v8.cc" />
     <ClCompile Include="src\napi\v8\native_source_code_android.cc" />
     <ClCompile Include="src\scope.cc" />
-    <ClCompile Include="src\task\common_task.cc" />
-    <ClCompile Include="src\task\javascript_task.cc" />
-    <ClCompile Include="src\task\javascript_task_runner.cc" />
-    <ClCompile Include="src\task\worker_task_runner.cc" />
     <ClCompile Include="third_party\base\src\base\log_settings.cc" />
     <ClCompile Include="third_party\base\src\base\log_settings_state.cc" />
+    <ClCompile Include="third_party\base\src\base\task.cc" />
+    <ClCompile Include="third_party\base\src\base\task_runner.cc" />
     <ClCompile Include="third_party\base\src\base\unicode_string_view.cc" />
+    <ClCompile Include="third_party\base\src\base\worker.cc" />
+    <ClCompile Include="third_party\base\src\base\worker_pool.cc" />
     <ClCompile Include="third_party\base\src\platform\adr\logging.cc" />
+    <ClCompile Include="third_party\base\src\platform\adr\thread.cc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{33620009-97b0-440a-88c7-af0afd05dad8}</ProjectGuid>
@@ -143,7 +143,7 @@
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>..\android\sdk\src\main\jni\third_party\v8\maintenance\x5-lite\include;.\include;..\android\sdk\src\main\jni;..\android\sdk\src\main\jni\include;.\third_party\base\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <CppLanguageStandard>c++14</CppLanguageStandard>
+      <CppLanguageStandard>c++1z</CppLanguageStandard>
       <PreprocessorDefinitions>OS_ANDROID;V8_IMMINENT_DEPRECATION_WARNINGS;V8_DEPRECATION_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>

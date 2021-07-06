@@ -23,21 +23,30 @@
 #include "core/engine.h"
 
 #include <memory>
-#include <mutex>  // NOLINT(build/c++11)
+#include <mutex>
 
+#include "base/task.h"
+#include "base/task_runner.h"
+#include "base/worker.h"
+#include "base/worker_pool.h"
 #include "core/scope.h"
-#include "core/task/javascript_task.h"
-#include "core/task/javascript_task_runner.h"
 
-const uint32_t Engine::kDefaultWorkerPoolSize = 1;
+const uint32_t Engine::kDefaultWorkerPoolSize = 2;
+
+using Task = tdf::base::Task;
+using Worker = tdf::base::Worker;
+using WorkerPool = tdf::base::WorkerPool;
 
 Engine::Engine(std::unique_ptr<RegisterMap> map)
     : vm_(nullptr), map_(std::move(map)), scope_cnt_(0) {
   SetupThreads();
 
-  std::shared_ptr<JavaScriptTask> task = std::make_shared<JavaScriptTask>();
-  task->callback = [=] { CreateVM(); };
-  js_runner_->PostTask(task);
+  std::unique_ptr<Task> task = std::make_unique<Task>();
+  task->cb_ = [this] {
+    js_thread_id_ = Worker::GetCurrentWorkerId();
+    CreateVM();
+  };
+  js_runner_->PostTask(std::move(task));
 }
 
 Engine::~Engine() {
@@ -66,12 +75,12 @@ std::shared_ptr<Scope> Engine::CreateScope(const std::string& name,
       std::make_shared<Scope>(this, name, std::move(map));
   scope->wrapper_ = std::make_unique<ScopeWrapper>(scope);
 
-  JavaScriptTask::Function cb = [scope_ = scope] { scope_->Initialized(); };
-  if (js_runner_->IsJsThread()) {
+  auto cb = [scope_ = scope] { scope_->Initialized(); };
+  if (Worker::GetCurrentWorkerId() == js_thread_id_) {
     cb();
   } else {
-    std::shared_ptr<JavaScriptTask> task = std::make_shared<JavaScriptTask>();
-    task->callback = cb;
+    std::unique_ptr<Task> task = std::make_unique<Task>();
+    task->cb_ = cb;
     js_runner_->PostTask(std::move(task));
   }
 
@@ -80,15 +89,11 @@ std::shared_ptr<Scope> Engine::CreateScope(const std::string& name,
 
 void Engine::SetupThreads() {
   TDF_BASE_DLOG(INFO) << "Engine SetupThreads";
-  js_runner_ = std::make_shared<JavaScriptTaskRunner>();
-  js_runner_->Start();
-
-  if (kDefaultWorkerPoolSize > 0) {
-    worker_task_runner_ =
-        std::make_shared<WorkerTaskRunner>(kDefaultWorkerPoolSize);
-  } else {
-    worker_task_runner_ = nullptr;
-  }
+  std::shared_ptr<WorkerPool> pool =
+      WorkerPool::GetInstance(kDefaultWorkerPoolSize);
+ 
+  js_runner_ = pool->CreateTaskRunner(true);
+  worker_task_runner_ = pool->CreateTaskRunner();
 }
 
 void Engine::CreateVM() {

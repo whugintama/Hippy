@@ -27,15 +27,15 @@
 #include <vector>
 
 #include "base/logging.h"
+#include "base/task_runner.h"
 #include "core/base/common.h"
 #include "core/napi/js_native_api_types.h"
-#include "core/task/javascript_task_runner.h"
-#include "core/task/worker_task_runner.h"
 
 class Scope;
 
 class Engine {
  public:
+  using TaskRunner = tdf::base::TaskRunner;
   using RegisterMap = hippy::base::RegisterMap;
   using VM = hippy::napi::VM;
   using RegisterFunction = hippy::base::RegisterFunction;
@@ -52,10 +52,10 @@ class Engine {
   inline std::shared_ptr<VM> GetVM() { return vm_; }
 
   void TerminateRunner();
-  inline std::shared_ptr<JavaScriptTaskRunner> GetJSRunner() {
+  inline std::shared_ptr<tdf::base::TaskRunner> GetJSRunner() {
     return js_runner_;
   }
-  inline std::shared_ptr<WorkerTaskRunner> GetWorkerTaskRunner() {
+  inline std::shared_ptr<tdf::base::TaskRunner> GetWorkerTaskRunner() {
     return worker_task_runner_;
   }
 
@@ -66,11 +66,12 @@ class Engine {
  private:
   static const uint32_t kDefaultWorkerPoolSize;
 
-  std::shared_ptr<JavaScriptTaskRunner> js_runner_;
-  std::shared_ptr<WorkerTaskRunner> worker_task_runner_;
+  std::shared_ptr<TaskRunner> js_runner_;
+  std::shared_ptr<TaskRunner> worker_task_runner_;
   std::shared_ptr<VM> vm_;
   std::unique_ptr<RegisterMap> map_;
   std::mutex cnt_mutex_;
   std::mutex runner_mutex_;
   uint32_t scope_cnt_;
+  int32_t js_thread_id_;
 };

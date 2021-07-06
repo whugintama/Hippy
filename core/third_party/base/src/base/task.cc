@@ -20,32 +20,14 @@
  *
  */
 
-#include "core/base/thread_id.h"
+#include "base/task.h"
 
-#include "base/logging.h"
+std::atomic<uint32_t> g_next_task_id{0};
 
-namespace hippy {
+namespace tdf {
 namespace base {
 
-pthread_t ThreadId::kInvalidId = 0;
-
-ThreadId::~ThreadId() {}
-
-void ThreadId::InitId(pthread_t id) {
-  if (id_ != kInvalidId) {
-    return;
-  }
-
-  TDF_BASE_CHECK(id != (pthread_t)(0));
-  id_ = id;
-}
-
-ThreadId ThreadId::GetCurrent() {
-  ThreadId id;
-  pthread_t tid = pthread_self();
-  id.InitId(tid);
-  return id;
-}
+Task::Task() : is_canceled_(false), cb_(nullptr) { id_ = g_next_task_id.fetch_add(1); }
 
 }  // namespace base
-}  // namespace hippy
+}  // namespace tdf
