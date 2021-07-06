@@ -25,14 +25,14 @@
 #include <string>
 #include <unordered_map>
 
+#include "base/task.h"
+#include "base/task_runner.h"
 #include "base/unicode_string_view.h"
 #include "core/base/common.h"
-#include "core/base/task.h"
 #include "core/base/uri_loader.h"
 #include "core/engine.h"
 #include "core/napi/js_native_api.h"
 #include "core/napi/js_native_api_types.h"
-#include "core/task/worker_task_runner.h"
 
 class JavaScriptTaskRunner;
 class ModuleBase;
@@ -56,6 +56,8 @@ class Scope {
   using FunctionData = hippy::napi::FunctionData;
   using BindingData = hippy::napi::BindingData;
   using Encoding = hippy::napi::Encoding;
+  using Task = tdf::base::TaskRunner;
+  using TaskRunner = tdf::base::TaskRunner;
 
   Scope(Engine* engine,
         const std::string& name,
@@ -93,16 +95,16 @@ class Scope {
                                       const unicode_string_view& name,
                                       bool is_copy = true);
 
-  inline std::shared_ptr<JavaScriptTaskRunner> GetTaskRunner() {
+  inline std::shared_ptr<TaskRunner> GetTaskRunner() {
     return engine_->GetJSRunner();
   }
 
-  inline std::shared_ptr<WorkerTaskRunner> GetWorkerTaskRunner() {
+  inline std::shared_ptr<TaskRunner> GetWorkerTaskRunner() {
     return engine_->GetWorkerTaskRunner();
   }
 
-  inline void AddTask(std::unique_ptr<hippy::base::Task> task) {
-    std::shared_ptr<JavaScriptTaskRunner> runner = engine_->GetJSRunner();
+  inline void AddTask(std::unique_ptr<tdf::base::Task> task) {
+    std::shared_ptr<TaskRunner> runner = engine_->GetJSRunner();
     if (runner) {
       runner->PostTask(std::move(task));
     }

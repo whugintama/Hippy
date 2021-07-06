@@ -25,12 +25,12 @@
 #include <memory>
 
 #include "base/logging.h"
+#include "base/task.h"
+#include "base/task_runner.h"
 #include "core/base/common.h"
 #include "core/base/string_view_utils.h"
 #include "core/modules/module_register.h"
 #include "core/napi/callback_info.h"
-#include "core/task/javascript_task.h"
-#include "core/task/javascript_task_runner.h"
 
 REGISTER_MODULE(TimerModule, SetTimeout)
 REGISTER_MODULE(TimerModule, ClearTimeout)
@@ -40,6 +40,9 @@ REGISTER_MODULE(TimerModule, ClearInterval)
 namespace napi = ::hippy::napi;
 
 using unicode_string_view = tdf::base::unicode_string_view;
+using Task = tdf::base::Task;
+using TaskRunner = tdf::base::TaskRunner;
+using TimeDelta = tdf::base::TimeDelta;
 using Ctx = hippy::napi::Ctx;
 using CtxValue = hippy::napi::CtxValue;
 using RegisterFunction = hippy::base::RegisterFunction;
@@ -72,7 +75,7 @@ void TimerModule::ClearInterval(const napi::CallbackInfo& info) {
     return;
   }
 
-  TaskId task_id = argument1;
+  uint32_t task_id = argument1;
   Cancel(task_id, scope);
   info.GetReturnValue()->Set(context->CreateNumber(task_id));
 }
@@ -93,18 +96,18 @@ std::shared_ptr<hippy::napi::CtxValue> TimerModule::Start(
 
   double number = 0;
   context->GetValueNumber(info[1], &number);
+  TimeDelta delta = TimeDelta::FromSecondsF(std::max(.0, number));
+  int64_t interval = delta.ToMilliseconds();
 
-  hippy::base::TaskRunner::DelayedTimeInMs interval =
-      static_cast<hippy::base::TaskRunner::DelayedTimeInMs>(
-          std::max(.0, number));
-
-  std::shared_ptr<JavaScriptTask> task = std::make_shared<JavaScriptTask>();
-  std::weak_ptr<JavaScriptTask> weak_task = task;
+  std::unique_ptr<Task> task = std::make_unique<Task>();
   std::weak_ptr<Scope> weak_scope = scope;
   std::weak_ptr<CtxValue> weak_function = function;
+  std::unique_ptr<Task>& quotes_task = task;
+  uint32_t task_id = task->id_;
 
-  task->callback = [this, weak_scope, weak_function, weak_task, repeat,
-                    interval] {
+  //to do cb复制问题
+  std::function<void()> cb = [this, weak_scope, weak_function, cb, quotes_task,
+                              repeat, delta] {
     std::shared_ptr<Scope> scope = weak_scope.lock();
     if (!scope) {
       return;
@@ -126,49 +129,37 @@ std::shared_ptr<hippy::napi::CtxValue> TimerModule::Start(
       }
     }
 
-    std::shared_ptr<JavaScriptTask> delayed_task = weak_task.lock();
     if (repeat) {
-      if (delayed_task) {
-        std::shared_ptr<JavaScriptTaskRunner> runner = scope->GetTaskRunner();
-        if (runner) {
-          runner->PostDelayedTask(delayed_task, interval);
-        }
+      std::shared_ptr<TaskRunner> runner = scope->GetTaskRunner();
+      std::unique_ptr<Task> repeat_task = std::make_unique<Task>();
+      repeat_task->cb_ = cb;
+      if (runner) {
+        runner->PostDelayedTask(std::move(repeat_task), delta);
       }
     } else {
-      RemoveTask(delayed_task);
+      RemoveTask(task_id);
     }
   };
 
-  std::shared_ptr<JavaScriptTaskRunner> runner = scope->GetTaskRunner();
+  std::shared_ptr<TaskRunner> runner = scope->GetTaskRunner();
   if (runner) {
-    runner->PostDelayedTask(task, interval);
+    runner->PostDelayedTask(std::move(task), delta);
   }
 
-  std::shared_ptr<TaskEntry> entry =
-      std::make_shared<TaskEntry>(context, task, function);
-  std::pair<TaskId, std::shared_ptr<TaskEntry>> item{task->id_,
-                                                     std::move(entry)};
-  task_map_.insert(item);
-
-  return context->CreateNumber(task->id_);
+  task_map_.insert({task_id, std::make_shared<TaskEntry>(context, function)});
+  return context->CreateNumber(task_id);
 }
 
-void TimerModule::RemoveTask(std::shared_ptr<JavaScriptTask> task) {
-  if (!task) {
-    return;
-  }
-
-  task_map_.erase(task->id_);
+void TimerModule::RemoveTask(uint32_t task_id) {
+  task_map_.erase(task_id);
 }
 
-void TimerModule::Cancel(TaskId task_id, std::shared_ptr<Scope> scope) {
+void TimerModule::Cancel(uint32_t task_id, std::shared_ptr<Scope> scope) {
   auto item = task_map_.find(task_id);
   if (item != task_map_.end()) {
-    std::shared_ptr<JavaScriptTaskRunner> runner = scope->GetTaskRunner();
-    std::shared_ptr<JavaScriptTask> task = item->second->task_.lock();
-
+    std::shared_ptr<TaskRunner> runner = scope->GetTaskRunner();
     if (runner) {
-      runner->CancelTask(task);
+      runner->CancelTask(task_id);
     }
     task_map_.erase(item->first);
   }
