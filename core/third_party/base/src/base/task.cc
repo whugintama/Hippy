@@ -27,7 +27,11 @@ std::atomic<uint32_t> g_next_task_id{0};
 namespace tdf {
 namespace base {
 
-Task::Task() : is_canceled_(false), cb_(nullptr) { id_ = g_next_task_id.fetch_add(1); }
+Task::Task() : Task(nullptr){};
+
+Task::Task(std::function<void()> exec_unit) : exec_unit_(exec_unit) {
+  id_ = g_next_task_id.fetch_add(1);
+}
 
 }  // namespace base
 }  // namespace tdf

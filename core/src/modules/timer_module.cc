@@ -25,6 +25,8 @@
 #include <memory>
 
 #include "base/logging.h"
+#include "base/one_shot_timer.h"
+#include "base/repeating_timer.h"
 #include "base/task.h"
 #include "base/task_runner.h"
 #include "core/base/common.h"
@@ -43,6 +45,8 @@ using unicode_string_view = tdf::base::unicode_string_view;
 using Task = tdf::base::Task;
 using TaskRunner = tdf::base::TaskRunner;
 using TimeDelta = tdf::base::TimeDelta;
+using RepeatingTimer = tdf::base::RepeatingTimer;
+using OneShotTimer = tdf::base::OneShotTimer;
 using Ctx = hippy::napi::Ctx;
 using CtxValue = hippy::napi::CtxValue;
 using RegisterFunction = hippy::base::RegisterFunction;
@@ -94,20 +98,20 @@ std::shared_ptr<hippy::napi::CtxValue> TimerModule::Start(
     return nullptr;
   }
 
+  std::shared_ptr<TaskRunner> runner = scope->GetTaskRunner();
+  TDF_BASE_DCHECK(runner);
+
   double number = 0;
   context->GetValueNumber(info[1], &number);
-  TimeDelta delta = TimeDelta::FromSecondsF(std::max(.0, number));
-  int64_t interval = delta.ToMilliseconds();
+  TimeDelta delay = TimeDelta::FromSecondsF(std::max(.0, number));
 
-  std::unique_ptr<Task> task = std::make_unique<Task>();
   std::weak_ptr<Scope> weak_scope = scope;
   std::weak_ptr<CtxValue> weak_function = function;
-  std::unique_ptr<Task>& quotes_task = task;
-  uint32_t task_id = task->id_;
 
-  //to do cb复制问题
-  std::function<void()> cb = [this, weak_scope, weak_function, cb, quotes_task,
-                              repeat, delta] {
+  std::unique_ptr<Task> task = std::make_unique<Task>();
+  uint32_t task_id = task->GetId();
+  std::function<void()> unit = [weak_scope, weak_function, task_id, repeat,
+                                timer_map = timer_map_] {
     std::shared_ptr<Scope> scope = weak_scope.lock();
     if (!scope) {
       return;
@@ -129,38 +133,29 @@ std::shared_ptr<hippy::napi::CtxValue> TimerModule::Start(
       }
     }
 
-    if (repeat) {
-      std::shared_ptr<TaskRunner> runner = scope->GetTaskRunner();
-      std::unique_ptr<Task> repeat_task = std::make_unique<Task>();
-      repeat_task->cb_ = cb;
-      if (runner) {
-        runner->PostDelayedTask(std::move(repeat_task), delta);
-      }
-    } else {
-      RemoveTask(task_id);
+    if (!repeat) {
+      timer_map.erase(task_id);
     }
   };
 
-  std::shared_ptr<TaskRunner> runner = scope->GetTaskRunner();
-  if (runner) {
-    runner->PostDelayedTask(std::move(task), delta);
+  if (repeat) {
+    std::unique_ptr<RepeatingTimer> timer =
+        std::make_unique<RepeatingTimer>(runner);
+    timer->Start(std::move(task), delay);
+    timer_map_.insert({task_id, std::move(timer)});
+  } else {
+    std::unique_ptr<OneShotTimer> timer =
+        std::make_unique<OneShotTimer>(runner);
+    timer->Start(std::move(task), delay);
+    timer_map_.insert({task_id, std::move(timer)});
   }
 
-  task_map_.insert({task_id, std::make_shared<TaskEntry>(context, function)});
   return context->CreateNumber(task_id);
 }
 
-void TimerModule::RemoveTask(uint32_t task_id) {
-  task_map_.erase(task_id);
-}
-
-void TimerModule::Cancel(uint32_t task_id, std::shared_ptr<Scope> scope) {
-  auto item = task_map_.find(task_id);
-  if (item != task_map_.end()) {
-    std::shared_ptr<TaskRunner> runner = scope->GetTaskRunner();
-    if (runner) {
-      runner->CancelTask(task_id);
-    }
-    task_map_.erase(item->first);
+void TimerModule::Cancel(uint32_t task_id) {
+  auto item = timer_map_.find(task_id);
+  if (item != timer_map_.end()) {
+    timer_map_.erase(item->first);
   }
 }
