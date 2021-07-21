@@ -36,7 +36,9 @@
 class Runtime {
  public:
   using TaskRunner = tdf::base::TaskRunner;
+#ifdef V8_HAS_INSPECTOR
   using V8InspectorClientImpl = hippy::inspector::V8InspectorClientImpl;
+#endif
   using CtxValue = hippy::napi::CtxValue;
 
   Runtime(std::shared_ptr<JavaRef> bridge, bool enable_v8_serialization, bool is_dev);
@@ -59,13 +61,14 @@ class Runtime {
   }
   inline void SetEngine(std::shared_ptr<Engine> engine) { engine_ = engine; }
   inline void SetScope(std::shared_ptr<Scope> scope) { scope_ = scope; }
+#ifdef V8_HAS_INSPECTOR
   inline void SetInspector(std::shared_ptr<V8InspectorClientImpl> inspector) {
     inspector_ = inspector;
   }
   inline std::shared_ptr<V8InspectorClientImpl> GetInspector() {
     return inspector_;
   }
-
+#endif
   static void Insert(std::shared_ptr<Runtime> runtime);
   static std::shared_ptr<Runtime> Find(int64_t id);
   static bool Erase(int64_t id);
