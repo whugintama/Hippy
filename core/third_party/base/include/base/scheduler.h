@@ -1,9 +1,8 @@
-#ifndef TDF_BASE_SCHEDULER_H_
-#define TDF_BASE_SCHEDULER_H_
+#pragma once
 
 #include <memory>
 
-#include "include/task_runner.h"
+#include "task_runner.h"
 
 namespace tdf {
 namespace base {
@@ -15,5 +14,3 @@ class Scheduler {
 };
 }  // namespace base
 }  // namespace tdf
-
-#endif  // TDF_BASE_SCHEDULER_H_

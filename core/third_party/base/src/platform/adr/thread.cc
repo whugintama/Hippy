@@ -1,6 +1,6 @@
 #define BASE_USED_ON_EMBEDDER
 
-#include "include/thread.h"
+#include "base/thread.h"
 
 #include <string>
 #include <thread>

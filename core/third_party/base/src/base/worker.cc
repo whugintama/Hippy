@@ -46,7 +46,7 @@ void Worker::Balance() {
 
 void Worker::RunTask() {
   auto task = GetNextTask();
-  if (task && !task->is_canceled_) {
+  if (task) {
     TimePoint begin = TimePoint::Now();
     task->Run();
     for (auto it = curr_group_.begin(); it != curr_group_.end(); ++it) {

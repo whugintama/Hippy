@@ -32,8 +32,6 @@
 #include "core/engine.h"
 #include "core/modules/module_register.h"
 #include "core/napi/native_source_code.h"
-#include "core/task/javascript_task.h"
-#include "core/task/javascript_task_runner.h"
 
 using unicode_string_view = tdf::base::unicode_string_view;
 
@@ -62,7 +60,7 @@ void Scope::WillExit() {
   std::promise<std::shared_ptr<CtxValue>> promise;
   std::future<std::shared_ptr<CtxValue>> future = promise.get_future();
   std::weak_ptr<Ctx> weak_context = context_;
-  JavaScriptTask::Function cb = hippy::base::MakeCopyable(
+  std::function<void()> unit = hippy::base::MakeCopyable(
       [weak_context, p = std::move(promise)]() mutable {
         TDF_BASE_LOG(INFO) << "run js WillExit begin";
         std::shared_ptr<CtxValue> rst = nullptr;
@@ -76,13 +74,11 @@ void Scope::WillExit() {
         }
         p.set_value(rst);
       });
-  std::shared_ptr<JavaScriptTaskRunner> runner = engine_->GetJSRunner();
-  if (runner->IsJsThread()) {
-    cb();
+  std::shared_ptr<TaskRunner> runner = engine_->GetJsRunner();
+  if (engine_->IsJsThread()) {
+    unit();
   } else {
-    std::shared_ptr<JavaScriptTask> task = std::make_shared<JavaScriptTask>();
-    task->callback = cb;
-    runner->PostTask(task);
+    runner->PostTask(std::make_unique<Task>(std::move(unit)));
   }
 
   future.get();
@@ -183,7 +179,7 @@ void Scope::RunJS(const unicode_string_view& data,
                   const unicode_string_view& name,
                   bool is_copy) {
   std::weak_ptr<Ctx> weak_context = context_;
-  JavaScriptTask::Function callback = [data, name, is_copy, weak_context] {
+  auto unit = [data, name, is_copy, weak_context] {
     std::shared_ptr<Ctx> context = weak_context.lock();
     if (!context) {
       return;
@@ -191,13 +187,11 @@ void Scope::RunJS(const unicode_string_view& data,
     context->RunScript(data, name, false, nullptr, is_copy);
   };
 
-  std::shared_ptr<JavaScriptTaskRunner> runner = engine_->GetJSRunner();
-  if (runner->IsJsThread()) {
-    callback();
+  std::shared_ptr<TaskRunner> runner = engine_->GetJsRunner();
+  if (engine_->IsJsThread()) {
+    unit();
   } else {
-    std::shared_ptr<JavaScriptTask> task = std::make_shared<JavaScriptTask>();
-    task->callback = callback;
-    runner->PostTask(task);
+    runner->PostTask(std::make_unique<Task>(std::move(unit)));
   }
 }
 
@@ -207,7 +201,7 @@ std::shared_ptr<CtxValue> Scope::RunJSSync(const unicode_string_view& data,
   std::promise<std::shared_ptr<CtxValue>> promise;
   std::future<std::shared_ptr<CtxValue>> future = promise.get_future();
   std::weak_ptr<Ctx> weak_context = context_;
-  JavaScriptTask::Function cb = hippy::base::MakeCopyable(
+  auto unit = hippy::base::MakeCopyable(
       [data, name, is_copy, weak_context, p = std::move(promise)]() mutable {
         std::shared_ptr<CtxValue> rst = nullptr;
         std::shared_ptr<Ctx> context = weak_context.lock();
@@ -217,13 +211,11 @@ std::shared_ptr<CtxValue> Scope::RunJSSync(const unicode_string_view& data,
         p.set_value(rst);
       });
 
-  std::shared_ptr<JavaScriptTaskRunner> runner = engine_->GetJSRunner();
-  if (runner->IsJsThread()) {
-    cb();
+  std::shared_ptr<TaskRunner> runner = engine_->GetJsRunner();
+  if (engine_->IsJsThread()) {
+    unit();
   } else {
-    std::shared_ptr<JavaScriptTask> task = std::make_shared<JavaScriptTask>();
-    task->callback = cb;
-    runner->PostTask(task);
+    runner->PostTask(std::make_unique<Task>(std::move(unit)));
   }
   std::shared_ptr<CtxValue> ret = future.get();
   return ret;

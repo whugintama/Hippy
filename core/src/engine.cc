@@ -41,11 +41,10 @@ Engine::Engine(std::unique_ptr<RegisterMap> map)
     : vm_(nullptr), map_(std::move(map)), scope_cnt_(0) {
   SetupThreads();
 
-  std::unique_ptr<Task> task = std::make_unique<Task>();
-  task->cb_ = [this] {
+  std::unique_ptr<Task> task = std::make_unique<Task>([this] {
     js_thread_id_ = Worker::GetCurrentWorkerId();
     CreateVM();
-  };
+  });
   js_runner_->PostTask(std::move(task));
 }
 
@@ -79,11 +78,8 @@ std::shared_ptr<Scope> Engine::CreateScope(const std::string& name,
   if (Worker::GetCurrentWorkerId() == js_thread_id_) {
     cb();
   } else {
-    std::unique_ptr<Task> task = std::make_unique<Task>();
-    task->cb_ = cb;
-    js_runner_->PostTask(std::move(task));
+    js_runner_->PostTask(std::make_unique<Task>(std::move(cb)));
   }
-
   return scope;
 }
 
@@ -91,7 +87,7 @@ void Engine::SetupThreads() {
   TDF_BASE_DLOG(INFO) << "Engine SetupThreads";
   std::shared_ptr<WorkerPool> pool =
       WorkerPool::GetInstance(kDefaultWorkerPoolSize);
- 
+
   js_runner_ = pool->CreateTaskRunner(true);
   worker_task_runner_ = pool->CreateTaskRunner();
 }

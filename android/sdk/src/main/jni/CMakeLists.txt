@@ -89,6 +89,7 @@ if (${JS_ENGINE} STREQUAL "V8")
   message("V8_RELEASE: ${V8_RELEASE}")
   add_definitions("-DV8_IMMINENT_DEPRECATION_WARNINGS")
   add_definitions("-DV8_DEPRECATION_WARNINGS")
+  add_definitions("-DV8_COMPRESS_POINTERS")
   # region remove jsc code
   file(GLOB_RECURSE JSC_SRC ${CORE_SRC_DIR}/src/napi/jsc/*)
   message("JSC_SRC: ${JSC_SRC}")

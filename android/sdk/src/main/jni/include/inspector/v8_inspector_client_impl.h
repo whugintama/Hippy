@@ -25,6 +25,7 @@
 #include <string>
 
 #include "base/unicode_string_view.h"
+#include "base/task_runner.h"
 #include "core/core.h"
 #include "jni/scoped_java_ref.h"
 #include "v8_channel_impl.h"
@@ -35,10 +36,14 @@ namespace inspector {
 class V8InspectorClientImpl : public v8_inspector::V8InspectorClient {
  public:
   using unicode_string_view = tdf::base::unicode_string_view;
+  using TaskRunner = tdf::base::TaskRunner;
 
-  explicit V8InspectorClientImpl(std::shared_ptr<Scope> scope);
+  explicit V8InspectorClientImpl(std::shared_ptr<Scope> scope, std::weak_ptr<TaskRunner> runner);
   ~V8InspectorClientImpl() = default;
 
+  inline std::shared_ptr<TaskRunner> GetConnectRunner() {
+    return connect_runner_;
+  }
   void Reset(std::shared_ptr<Scope> scope, std::shared_ptr<JavaRef> bridge);
   void Connect(std::shared_ptr<JavaRef> bridge);
 
@@ -105,6 +110,9 @@ class V8InspectorClientImpl : public v8_inspector::V8InspectorClient {
   std::unique_ptr<v8_inspector::V8Inspector> inspector_;
   std::unique_ptr<V8ChannelImpl> channel_;
   std::unique_ptr<v8_inspector::V8InspectorSession> session_;
+  std::weak_ptr<TaskRunner> js_runner_;
+  std::shared_ptr<TaskRunner> inspector_runner_;
+  std::shared_ptr<TaskRunner> connect_runner_;
 };
 
 }  // namespace inspector

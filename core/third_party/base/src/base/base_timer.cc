@@ -21,10 +21,14 @@ void BaseTimer::ScheduleNewTask(TimeDelta delay) {
 
   is_running_ = true;
   if (delay > TimeDelta::Zero()) {
-    task_runner->PostDelayedTask(std::make_unique<Task>(user_task_), delay);
+    task_runner->PostDelayedTask(std::make_unique<Task>([this]{
+      OnScheduledTaskInvoked();
+    }), delay);
     scheduled_run_time_ = desired_run_time_ = TimePoint::Now() + delay;
   } else {
-    task_runner->PostTask(std::make_unique<Task>(user_task_));
+    task_runner->PostTask(std::make_unique<Task>([this]{
+      OnScheduledTaskInvoked();
+    }));
     scheduled_run_time_ = desired_run_time_ = TimePoint::Now();
   }
 }

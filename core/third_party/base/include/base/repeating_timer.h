@@ -2,7 +2,8 @@
 
 #include "base/base_timer.h"
 
-namespace tdf::base {
+namespace tdf {
+namespace base {
 
 class RepeatingTimer : public BaseTimer {
  public:
@@ -19,4 +20,5 @@ class RepeatingTimer : public BaseTimer {
   TDF_BASE_DISALLOW_COPY_AND_ASSIGN(RepeatingTimer);
 };
 
-}  // namespace tdf::base
+}
+}

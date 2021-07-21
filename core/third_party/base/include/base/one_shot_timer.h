@@ -2,7 +2,8 @@
 
 #include "base/base_timer.h"
 
-namespace tdf::base {
+namespace tdf {
+namespace base {
 
 class OneShotTimer : public BaseTimer {
  public:
@@ -23,4 +24,5 @@ class OneShotTimer : public BaseTimer {
   TDF_BASE_DISALLOW_COPY_AND_ASSIGN(OneShotTimer);
 };
 
-}  // namespace tdf::base
+}
+}

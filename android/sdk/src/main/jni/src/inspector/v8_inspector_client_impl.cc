@@ -27,8 +27,9 @@
 namespace hippy {
 namespace inspector {
 
-V8InspectorClientImpl::V8InspectorClientImpl(std::shared_ptr<Scope> scope)
-    : scope_(scope) {
+V8InspectorClientImpl::V8InspectorClientImpl(std::shared_ptr<Scope> scope,
+                                             std::weak_ptr<TaskRunner> runner)
+    : scope_(scope), js_runner_(runner) {
   std::shared_ptr<hippy::napi::V8Ctx> ctx =
       std::static_pointer_cast<hippy::napi::V8Ctx>(scope_->GetContext());
   v8::Isolate* isolate = ctx->isolate_;
@@ -127,15 +128,23 @@ v8::Local<v8::Context> V8InspectorClientImpl::ensureDefaultContextInGroup(
 }
 
 void V8InspectorClientImpl::runMessageLoopOnPause(int contextGroupId) {
-  scope_->GetTaskRunner()->PauseThreadForInspector();
+  std::shared_ptr<TaskRunner> runner = js_runner_.lock();
+  if (runner) {
+    inspector_runner_ = std::make_shared<TaskRunner>();
+    runner->AddSubTaskRunner(inspector_runner_, true);
+  }
 }
 
 void V8InspectorClientImpl::quitMessageLoopOnPause() {
-  scope_->GetTaskRunner()->ResumeThreadForInspector();
+  std::shared_ptr<TaskRunner> runner = js_runner_.lock();
+  if (runner) {
+    runner->RemoveSubTaskRunner(inspector_runner_);
+    inspector_runner_ = nullptr;
+  }
 }
 
 void V8InspectorClientImpl::runIfWaitingForDebugger(int contextGroupId) {
-  scope_->GetTaskRunner()->ResumeThreadForInspector();
+  quitMessageLoopOnPause();
 }
 
 }  // namespace inspector

@@ -29,7 +29,7 @@ namespace base {
 
 Task::Task() : Task(nullptr){};
 
-Task::Task(std::function<void()> exec_unit) : exec_unit_(exec_unit) {
+Task::Task(std::function<void()> exec_unit) : unit_(exec_unit) {
   id_ = g_next_task_id.fetch_add(1);
 }
 

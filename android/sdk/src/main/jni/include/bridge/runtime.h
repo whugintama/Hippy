@@ -35,6 +35,10 @@
 
 class Runtime {
  public:
+  using TaskRunner = tdf::base::TaskRunner;
+  using V8InspectorClientImpl = hippy::inspector::V8InspectorClientImpl;
+  using CtxValue = hippy::napi::CtxValue;
+
   Runtime(std::shared_ptr<JavaRef> bridge, bool enable_v8_serialization, bool is_dev);
 
   inline bool IsEnableV8Serialization() { return enable_v8_serialization_; }
@@ -44,7 +48,7 @@ class Runtime {
   inline std::shared_ptr<JavaRef> GetBridge() { return bridge_; }
   inline std::shared_ptr<Engine> GetEngine() { return engine_; }
   inline std::shared_ptr<Scope> GetScope() { return scope_; }
-  inline std::shared_ptr<hippy::napi::CtxValue> GetBridgeFunc() {
+  inline std::shared_ptr<CtxValue> GetBridgeFunc() {
     return bridge_func_;
   }
   inline std::string& GetBuffer() { return serializer_reused_buffer_; }
@@ -55,6 +59,12 @@ class Runtime {
   }
   inline void SetEngine(std::shared_ptr<Engine> engine) { engine_ = engine; }
   inline void SetScope(std::shared_ptr<Scope> scope) { scope_ = scope; }
+  inline void SetInspector(std::shared_ptr<V8InspectorClientImpl> inspector) {
+    inspector_ = inspector;
+  }
+  inline std::shared_ptr<V8InspectorClientImpl> GetInspector() {
+    return inspector_;
+  }
 
   static void Insert(std::shared_ptr<Runtime> runtime);
   static std::shared_ptr<Runtime> Find(int64_t id);
@@ -71,6 +81,9 @@ class Runtime {
   std::string serializer_reused_buffer_;
   std::shared_ptr<Engine> engine_;
   std::shared_ptr<Scope> scope_;
-  std::shared_ptr<hippy::napi::CtxValue> bridge_func_;
+  std::shared_ptr<CtxValue> bridge_func_;
   int64_t id_;
+#ifdef V8_HAS_INSPECTOR
+  std::shared_ptr<V8InspectorClientImpl> inspector_;
+#endif
 };

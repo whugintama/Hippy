@@ -32,6 +32,9 @@
 #include <string>
 #include <unordered_map>
 
+#include "base/task.h"
+#include "base/task_runner.h"
+#include "base/worker_pool.h"
 #include "bridge/java2js.h"
 #include "bridge/js2java.h"
 #include "bridge/runtime.h"
@@ -69,6 +72,9 @@ REGISTER_JNI("com/tencent/mtt/hippy/bridge/HippyBridgeImpl",
 
 using unicode_string_view = tdf::base::unicode_string_view;
 using u8string = unicode_string_view::u8string;
+using WorkerPool = tdf::base::WorkerPool;
+using TaskRunner = tdf::base::TaskRunner;
+using Task = tdf::base::Task;
 using RegisterMap = hippy::base::RegisterMap;
 using RegisterFunction = hippy::base::RegisterFunction;
 using Ctx = hippy::napi::Ctx;
@@ -76,7 +82,7 @@ using StringViewUtils = hippy::base::StringViewUtils;
 using HippyFile = hippy::base::HippyFile;
 #ifdef V8_HAS_INSPECTOR
 using V8InspectorClientImpl = hippy::inspector::V8InspectorClientImpl;
-std::shared_ptr<V8InspectorClientImpl> global_inspector = nullptr;
+std::shared_ptr<V8InspectorClientImpl> debugging_inspector = nullptr;
 #endif
 
 static std::unordered_map<int64_t, std::pair<std::shared_ptr<Engine>, uint32_t>>
@@ -136,7 +142,7 @@ bool RunScript(std::shared_ptr<Runtime> runtime,
   unicode_string_view code_cache_content;
   uint64_t modify_time = 0;
 
-  std::shared_ptr<WorkerTaskRunner> task_runner;
+  std::shared_ptr<TaskRunner> task_runner;
   unicode_string_view code_cache_path;
   if (is_use_code_cache) {
     if (!asset_manager) {
@@ -159,8 +165,7 @@ bool RunScript(std::shared_ptr<Runtime> runtime,
 
     std::promise<u8string> read_file_promise;
     std::future<u8string> read_file_future = read_file_promise.get_future();
-    std::unique_ptr<CommonTask> task = std::make_unique<CommonTask>();
-    task->func_ =
+    auto unit =
         hippy::base::MakeCopyable([p = std::move(read_file_promise),
                                    code_cache_path, code_cache_dir]() mutable {
           u8string content;
@@ -178,7 +183,7 @@ bool RunScript(std::shared_ptr<Runtime> runtime,
 
     std::shared_ptr<Engine> engine = runtime->GetEngine();
     task_runner = engine->GetWorkerTaskRunner();
-    task_runner->PostTask(std::move(task));
+    task_runner->PostTask(std::make_unique<Task>(std::move(unit)));
     u8string content;
     runtime->GetScope()->GetUriLoader()->RequestUntrustedContent(uri, content);
     script_content = unicode_string_view(std::move(content));
@@ -203,8 +208,7 @@ bool RunScript(std::shared_ptr<Runtime> runtime,
                              &code_cache_content);
   if (is_use_code_cache) {
     if (!StringViewUtils::IsEmpty(code_cache_content)) {
-      std::unique_ptr<CommonTask> task = std::make_unique<CommonTask>();
-      task->func_ = [code_cache_path, code_cache_dir, code_cache_content] {
+      auto unit = [code_cache_path, code_cache_dir, code_cache_content] {
         int check_dir_ret = HippyFile::CheckDir(code_cache_dir, F_OK);
         TDF_BASE_DLOG(INFO) << "check_parent_dir_ret = " << check_dir_ret;
         if (check_dir_ret) {
@@ -230,7 +234,7 @@ bool RunScript(std::shared_ptr<Runtime> runtime,
         TDF_BASE_LOG(INFO) << "code cache save_file_ret = " << save_file_ret;
         HIPPY_USE(save_file_ret);
       };
-      task_runner->PostTask(std::move(task));
+      task_runner->PostTask(std::make_unique<Task>(std::move(unit)));
     }
   }
 
@@ -273,13 +277,12 @@ jboolean RunScriptFromUri(JNIEnv* j_env,
                       << ", base_path = " << base_path
                       << ", code_cache_dir = " << code_cache_dir;
 
-  auto runner = runtime->GetEngine()->GetJSRunner();
+  auto runner = runtime->GetEngine()->GetJsRunner();
   std::shared_ptr<Ctx> ctx = runtime->GetScope()->GetContext();
-  std::shared_ptr<JavaScriptTask> task = std::make_shared<JavaScriptTask>();
-  task->callback = [ctx, base_path] {
+  auto set_base_path_unit = [ctx, base_path] {
     ctx->SetGlobalStrVar("__HIPPYCURDIR__", base_path);
   };
-  runner->PostTask(task);
+  runner->PostTask(std::make_unique<Task>(set_base_path_unit));
 
   std::shared_ptr<ADRLoader> loader = std::make_shared<ADRLoader>();
   loader->SetBridge(runtime->GetBridge());
@@ -292,8 +295,7 @@ jboolean RunScriptFromUri(JNIEnv* j_env,
   }
 
   std::shared_ptr<JavaRef> save_object = std::make_shared<JavaRef>(j_env, j_cb);
-  task = std::make_shared<JavaScriptTask>();
-  task->callback = [runtime, save_object_ = std::move(save_object), script_name,
+  auto run_script_unit = [runtime, save_object_ = std::move(save_object), script_name,
                     j_can_use_code_cache, code_cache_dir, uri, aasset_manager,
                     time_begin] {
     TDF_BASE_DLOG(INFO) << "runScriptFromUri enter tast";
@@ -320,7 +322,7 @@ jboolean RunScriptFromUri(JNIEnv* j_env,
     return flag;
   };
 
-  runner->PostTask(task);
+  runner->PostTask(std::make_unique<Task>(std::move(run_script_unit)));
 
   return true;
 }
@@ -392,7 +394,6 @@ jlong InitInstance(JNIEnv* j_env,
       JniUtils::JByteArrayToStrView(j_env, j_global_config);
 
   TDF_BASE_LOG(INFO) << "global_config = " << global_config;
-  std::shared_ptr<JavaScriptTask> task = std::make_shared<JavaScriptTask>();
   std::shared_ptr<JavaRef> save_object =
       std::make_shared<JavaRef>(j_env, j_callback);
 
@@ -411,13 +412,16 @@ jlong InitInstance(JNIEnv* j_env,
     }
 #ifdef V8_HAS_INSPECTOR
     if (runtime->IsDebug()) {
-      if (!global_inspector) {
-        global_inspector = std::make_shared<V8InspectorClientImpl>(scope);
-        global_inspector->Connect(runtime->GetBridge());
+      if (!runtime->GetInspector()) {
+        std::shared_ptr<V8InspectorClientImpl> inspector =
+            std::make_shared<V8InspectorClientImpl>(scope, runtime->GetEngine()->GetJsRunner());
+        runtime->SetInspector(inspector);
+        inspector->Connect(runtime->GetBridge());
+        debugging_inspector = inspector;
       } else {
-        global_inspector->Reset(scope, runtime->GetBridge());
+        debugging_inspector->Reset(scope, runtime->GetBridge());
       }
-      global_inspector->CreateContext();
+      debugging_inspector->CreateContext();
     }
 #endif
     std::shared_ptr<Ctx> ctx = scope->GetContext();
@@ -506,13 +510,12 @@ void DestroyInstance(JNIEnv* j_env,
     return;
   }
 
-  std::shared_ptr<JavaScriptTask> task = std::make_shared<JavaScriptTask>();
-  task->callback = [runtime, runtime_id] {
+  auto unit = [runtime, runtime_id] {
     TDF_BASE_LOG(INFO) << "js destroy begin, runtime_id " << runtime_id;
 #ifdef V8_HAS_INSPECTOR
     if (runtime->IsDebug()) {
-      global_inspector->DestroyContext();
-      global_inspector->Reset(nullptr, runtime->GetBridge());
+      debugging_inspector->DestroyContext();
+      debugging_inspector->Reset(nullptr, runtime->GetBridge());
     } else {
       runtime->GetScope()->WillExit();
     }
@@ -531,7 +534,8 @@ void DestroyInstance(JNIEnv* j_env,
   if (group == kDebuggerEngineId) {
     runtime->GetScope()->WillExit();
   }
-  runtime->GetEngine()->GetJSRunner()->PostTask(task);
+  runtime->GetEngine()->GetJsRunner()->PostTask(
+      std::make_unique<Task>(std::move(unit)));
   TDF_BASE_DLOG(INFO) << "destroy, group = " << group;
   if (group == kDebuggerEngineId) {
   } else if (group == kDefaultEngineId) {

@@ -36,6 +36,7 @@ class Scope;
 class Engine {
  public:
   using TaskRunner = tdf::base::TaskRunner;
+  using Worker = tdf::base::Worker;
   using RegisterMap = hippy::base::RegisterMap;
   using VM = hippy::napi::VM;
   using RegisterFunction = hippy::base::RegisterFunction;
@@ -52,7 +53,12 @@ class Engine {
   inline std::shared_ptr<VM> GetVM() { return vm_; }
 
   void TerminateRunner();
-  inline std::shared_ptr<tdf::base::TaskRunner> GetJSRunner() {
+
+  inline bool IsJsThread() {
+    return Worker::GetCurrentWorkerId() == js_thread_id_;
+  }
+
+  inline std::shared_ptr<tdf::base::TaskRunner> GetJsRunner() {
     return js_runner_;
   }
   inline std::shared_ptr<tdf::base::TaskRunner> GetWorkerTaskRunner() {

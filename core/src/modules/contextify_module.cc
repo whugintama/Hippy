@@ -22,7 +22,7 @@
 
 #include "core/modules/contextify_module.h"
 
-#include <string.h>
+#include <string>
 
 #include <memory>
 #include <string>
@@ -35,14 +35,13 @@
 #include "core/napi/js_native_api.h"
 #include "core/napi/js_native_api_types.h"
 #include "core/napi/native_source_code.h"
-#include "core/task/common_task.h"
-#include "core/task/javascript_task.h"
 
 REGISTER_MODULE(ContextifyModule, RunInThisContext)
 REGISTER_MODULE(ContextifyModule, LoadUntrustedContent)
 
 using unicode_string_view = tdf::base::unicode_string_view;
 using u8string = unicode_string_view::u8string;
+using Task = tdf::base::Task;
 using Ctx = hippy::napi::Ctx;
 using CtxValue = hippy::napi::CtxValue;
 using CallbackInfo = hippy::napi::CallbackInfo;
@@ -142,9 +141,7 @@ void ContextifyModule::LoadUntrustedContent(const CallbackInfo& info) {
                           << ", encode = " << encode
                           << ", code = " << unicode_string_view(code);
     }
-    std::shared_ptr<JavaScriptTask> js_task =
-        std::make_shared<JavaScriptTask>();
-    js_task->callback = [this, weak_scope, weak_function,
+    auto unit = [this, weak_scope, weak_function,
                          move_code = std::move(code), cur_dir, file_name,
                          uri]() {
       std::shared_ptr<Scope> scope = weak_scope.lock();
@@ -189,7 +186,7 @@ void ContextifyModule::LoadUntrustedContent(const CallbackInfo& info) {
         RemoveCBFunc(uri);
       }
     };
-    scope->GetTaskRunner()->PostTask(js_task);
+    scope->GetTaskRunner()->PostTask(std::make_unique<Task>(std::move(unit)));
   };
   loader->RequestUntrustedContent(uri, cb);
   info.GetReturnValue()->SetUndefined();

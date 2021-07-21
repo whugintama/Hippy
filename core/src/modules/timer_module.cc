@@ -73,14 +73,12 @@ void TimerModule::ClearInterval(const napi::CallbackInfo& info) {
   std::shared_ptr<Ctx> context = scope->GetContext();
   TDF_BASE_CHECK(context);
 
-  int32_t argument1 = 0;
-  if (!context->GetValueNumber(info[0], &argument1)) {
+  int32_t task_id = 0;
+  if (!context->GetValueNumber(info[0], &task_id)) {
     info.GetExceptionValue()->Set(context, "The first argument must be int32.");
     return;
   }
-
-  uint32_t task_id = argument1;
-  Cancel(task_id, scope);
+  Cancel(task_id);
   info.GetReturnValue()->Set(context->CreateNumber(task_id));
 }
 
@@ -111,7 +109,7 @@ std::shared_ptr<hippy::napi::CtxValue> TimerModule::Start(
   std::unique_ptr<Task> task = std::make_unique<Task>();
   uint32_t task_id = task->GetId();
   std::function<void()> unit = [weak_scope, weak_function, task_id, repeat,
-                                timer_map = timer_map_] {
+                                this] {
     std::shared_ptr<Scope> scope = weak_scope.lock();
     if (!scope) {
       return;
@@ -134,7 +132,8 @@ std::shared_ptr<hippy::napi::CtxValue> TimerModule::Start(
     }
 
     if (!repeat) {
-      timer_map.erase(task_id);
+      //to do 如何判断map是否还有效
+      Cancel(task_id);
     }
   };
 

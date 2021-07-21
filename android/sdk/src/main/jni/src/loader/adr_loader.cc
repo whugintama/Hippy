@@ -33,6 +33,8 @@
 #include "jni/uri.h"
 
 using unicode_string_view = tdf::base::unicode_string_view;
+using TaskRunner = tdf::base::TaskRunner;
+using Task = tdf::base::Task;
 using StringViewUtils = hippy::base::StringViewUtils;
 using HippyFile = hippy::base::HippyFile;
 using u8string = unicode_string_view::u8string;
@@ -102,17 +104,16 @@ bool ADRLoader::RequestUntrustedContent(const unicode_string_view& uri,
 
 bool ADRLoader::LoadByFile(const unicode_string_view& path,
                            std::function<void(u8string)> cb) {
-  std::shared_ptr<WorkerTaskRunner> runner = runner_.lock();
+  std::shared_ptr<TaskRunner> runner = runner_.lock();
   if (!runner) {
     return false;
   }
-  std::unique_ptr<CommonTask> task = std::make_unique<CommonTask>();
-  task->func_ = [path, cb] {
+  auto unit = [path, cb] {
     u8string ret;
     HippyFile::ReadFile(path, ret, false);
     cb(std::move(ret));
   };
-  runner->PostTask(std::move(task));
+  runner->PostTask(std::make_unique<Task>(std::move(unit)));
 
   return true;
 }
@@ -121,17 +122,16 @@ bool ADRLoader::LoadByAsset(const unicode_string_view& path,
                             std::function<void(u8string)> cb,
                             bool is_auto_fill) {
   TDF_BASE_DLOG(INFO) << "ReadAssetFile file_path = " << path;
-  std::shared_ptr<WorkerTaskRunner> runner = runner_.lock();
+  std::shared_ptr<TaskRunner> runner = runner_.lock();
   if (!runner) {
     return false;
   }
-  std::unique_ptr<CommonTask> task = std::make_unique<CommonTask>();
-  task->func_ = [path, aasset_manager = aasset_manager_, is_auto_fill, cb] {
+  auto unit = [path, aasset_manager = aasset_manager_, is_auto_fill, cb] {
     u8string ret;
     ReadAsset(path, aasset_manager, ret, is_auto_fill);
     cb(std::move(ret));
   };
-  runner->PostTask(std::move(task));
+  runner->PostTask(std::make_unique<Task>(std::move(unit)));
 
   return true;
 }

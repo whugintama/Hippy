@@ -74,6 +74,7 @@ class ADRLoader : public hippy::base::UriLoader {
  public:
   using unicode_string_view = tdf::base::unicode_string_view;
   using u8string = unicode_string_view::u8string;
+  using TaskRunner = tdf::base::TaskRunner;
 
   ADRLoader();
   virtual ~ADRLoader() {}
@@ -87,7 +88,7 @@ class ADRLoader : public hippy::base::UriLoader {
   inline void SetAAssetManager(AAssetManager* aasset_manager) {
     aasset_manager_ = aasset_manager;
   }
-  inline void SetWorkerTaskRunner(std::weak_ptr<WorkerTaskRunner> runner) {
+  inline void SetWorkerTaskRunner(std::weak_ptr<TaskRunner> runner) {
     runner_ = runner;
   }
   std::function<void(u8string)> GetRequestCB(int64_t request_id);
@@ -104,6 +105,6 @@ class ADRLoader : public hippy::base::UriLoader {
 
   std::shared_ptr<JavaRef> bridge_;
   AAssetManager* aasset_manager_;
-  std::weak_ptr<WorkerTaskRunner> runner_;
+  std::weak_ptr<TaskRunner> runner_;
   std::unordered_map<int64_t, std::function<void(u8string)>> request_map_;
 };

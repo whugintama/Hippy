@@ -49,14 +49,16 @@ REGISTER_JNI("com/tencent/mtt/hippy/bridge/HippyBridgeImpl",
              CallFunctionByDirectBuffer)
 
 using unicode_string_view = tdf::base::unicode_string_view;
+using TaskRunner = tdf::base::TaskRunner;
+using Task = tdf::base::Task;
 using bytes = std::string;
-
 using Ctx = hippy::napi::Ctx;
 using CtxValue = hippy::napi::CtxValue;
 using StringViewUtils = hippy::base::StringViewUtils;
+
 #ifdef V8_HAS_INSPECTOR
 using V8InspectorClientImpl = hippy::inspector::V8InspectorClientImpl;
-extern std::shared_ptr<V8InspectorClientImpl> global_inspector;
+extern std::shared_ptr<V8InspectorClientImpl> debugging_inspector;
 #endif
 
 const char kHippyBridgeName[] = "hippyBridge";
@@ -75,12 +77,23 @@ void CallFunction(JNIEnv* j_env,
     return;
   }
 
-  std::shared_ptr<JavaScriptTaskRunner> runner =
-      runtime->GetEngine()->GetJSRunner();
+  std::shared_ptr<TaskRunner> runner = runtime->GetEngine()->GetJsRunner();
   unicode_string_view action_name = JniUtils::ToStrView(j_env, j_action);
   std::shared_ptr<JavaRef> cb = std::make_shared<JavaRef>(j_env, j_callback);
-  std::shared_ptr<JavaScriptTask> task = std::make_shared<JavaScriptTask>();
-  task->callback = [runtime, cb_ = std::move(cb), action_name,
+  if (runtime->IsDebug() &&
+      !action_name.utf16_value().compare(u"onWebsocketMsg")) {
+#ifdef V8_HAS_INSPECTOR
+    auto connect_runner = runtime->GetInspector()->GetConnectRunner();
+    std::u16string str(reinterpret_cast<const char16_t*>(&buffer_data[0]),
+                       buffer_data.length() / sizeof(char16_t));
+    debugging_inspector->SendMessageToV8(
+        std::move(unicode_string_view(std::move(str))));
+#endif
+    CallJavaMethod(cb->GetObj(), CALLFUNCTION_CB_STATE::SUCCESS);
+    return;
+  }
+
+  auto unit = [runtime, cb_ = std::move(cb), action_name,
                     buffer_data_ = std::move(buffer_data),
                     buffer_owner_ = std::move(buffer_owner)] {
     JNIEnv* j_env = JNIEnvironment::GetInstance()->AttachCurrentThread();
@@ -110,18 +123,6 @@ void CallFunction(JNIEnv* j_env,
     }
     TDF_BASE_DCHECK(action_name.encoding() ==
                     unicode_string_view::Encoding::Utf16);
-    if (runtime->IsDebug() &&
-        !action_name.utf16_value().compare(u"onWebsocketMsg")) {
-#ifdef V8_HAS_INSPECTOR
-      std::u16string str(reinterpret_cast<const char16_t*>(&buffer_data_[0]),
-                         buffer_data_.length() / sizeof(char16_t));
-      global_inspector->SendMessageToV8(
-          std::move(unicode_string_view(std::move(str))));
-#endif
-      CallJavaMethod(cb_->GetObj(), CALLFUNCTION_CB_STATE::SUCCESS);
-      return;
-    }
-
     std::shared_ptr<CtxValue> action = context->CreateString(action_name);
     std::shared_ptr<CtxValue> params;
     if (runtime->IsEnableV8Serialization()) {
@@ -172,7 +173,7 @@ void CallFunction(JNIEnv* j_env,
     CallJavaMethod(cb_->GetObj(), CALLFUNCTION_CB_STATE::SUCCESS);
   };
 
-  runner->PostTask(task);
+  runner->PostTask(std::make_unique<Task>(std::move(unit)));
 }
 
 void CallFunctionByHeapBuffer(JNIEnv* j_env,

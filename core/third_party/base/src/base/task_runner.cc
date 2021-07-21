@@ -60,7 +60,7 @@ void TaskRunner::Terminate() {
   Clear();
 }
 
-void TaskRunner::PostTask(std::shard_ptr<Task> task) {
+void TaskRunner::PostTask(std::unique_ptr<Task> task) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   task_queue_.push(std::move(task));
@@ -80,15 +80,6 @@ void TaskRunner::PostDelayedTask(std::unique_ptr<Task> task, TimeDelta delay) {
   delayed_task_queue_.push(std::make_pair(deadline, std::move(task)));
 
   cv_->notify_one();
-}
-
-void TaskRunner::CancelTask(std::unique_ptr<Task>& task) {
-  std::lock_guard<std::mutex> lock(mutex_);
-
-  if (!task) {
-    return;
-  }
-  task->is_canceled_ = true;
 }
 
 std::unique_ptr<Task> TaskRunner::PopTask() {

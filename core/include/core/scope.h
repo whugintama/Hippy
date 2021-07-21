@@ -56,7 +56,7 @@ class Scope {
   using FunctionData = hippy::napi::FunctionData;
   using BindingData = hippy::napi::BindingData;
   using Encoding = hippy::napi::Encoding;
-  using Task = tdf::base::TaskRunner;
+  using Task = tdf::base::Task;
   using TaskRunner = tdf::base::TaskRunner;
 
   Scope(Engine* engine,
@@ -96,7 +96,7 @@ class Scope {
                                       bool is_copy = true);
 
   inline std::shared_ptr<TaskRunner> GetTaskRunner() {
-    return engine_->GetJSRunner();
+    return engine_->GetJsRunner();
   }
 
   inline std::shared_ptr<TaskRunner> GetWorkerTaskRunner() {
@@ -104,7 +104,7 @@ class Scope {
   }
 
   inline void AddTask(std::unique_ptr<tdf::base::Task> task) {
-    std::shared_ptr<TaskRunner> runner = engine_->GetJSRunner();
+    std::shared_ptr<TaskRunner> runner = engine_->GetJsRunner();
     if (runner) {
       runner->PostTask(std::move(task));
     }

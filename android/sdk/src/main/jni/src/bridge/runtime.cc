@@ -32,7 +32,10 @@ static std::mutex mutex;
 static std::atomic<int64_t> global_runtime_key{0};
 
 Runtime::Runtime(std::shared_ptr<JavaRef> bridge, bool enable_v8_serialization, bool is_dev)
-    : enable_v8_serialization_(enable_v8_serialization), is_debug_(is_dev), bridge_(bridge) {
+    : enable_v8_serialization_(enable_v8_serialization),
+      is_debug_(is_dev),
+      bridge_(bridge),
+      inspector_(nullptr) {
   id_ = global_runtime_key.fetch_add(1);
 }
 

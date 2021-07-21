@@ -418,6 +418,7 @@ namespace base {
 inline unicode_string_view operator+(const unicode_string_view& lhs,
                                      const unicode_string_view& rhs) {
   using StringViewUtils = hippy::base::StringViewUtils;
+
   unicode_string_view::unicode_string_view::Encoding lhs_encoding =
       lhs.encoding();
   unicode_string_view::Encoding rhs_encoding = rhs.encoding();
