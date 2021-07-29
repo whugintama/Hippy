@@ -88,7 +88,9 @@ void JsCallbackFunc(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
   v8::Context::Scope context_scope(context);
   TDF_BASE_DLOG(INFO) << "callback_info info.length = " << info.Length();
+
   for (int i = 0; i < info.Length(); i++) {
+    TDF_BASE_DLOG(INFO) << "type = " << info[i]->IsString();
     callback_info.AddValue(std::make_shared<V8CtxValue>(isolate, info[i]));
   }
   callback(callback_info);
@@ -135,23 +137,28 @@ void GetInternalBinding(const v8::FunctionCallbackInfo<v8::Value>& info) {
   TDF_BASE_DLOG(INFO) << "v8 GetInternalBinding begin";
 
   auto data = info.Data().As<v8::External>();
+
   if (data.IsEmpty()) {
     info.GetReturnValue().SetUndefined();
     return;
   }
-
+  TDF_BASE_DLOG(INFO) << "data is not empty";
   size_t count = info.Length();
-  if (count <= 0 || !info[0]->IsString()) {
+
+  if (count <= 0 || info[0].IsEmpty()) {
+    TDF_BASE_DLOG(INFO) << "info[0] not string";
     info.GetReturnValue().SetUndefined();
     return;
   }
+
+  TDF_BASE_DLOG(INFO) << "info is not empty";
 
   BindingData* binding_data = reinterpret_cast<BindingData*>(data->Value());
   if (!binding_data) {
     info.GetReturnValue().SetUndefined();
     return;
   }
-
+  TDF_BASE_DLOG(INFO) << "binding_data is not empty";
   std::shared_ptr<Scope> scope = binding_data->scope_.lock();
   if (!scope) {
     TDF_BASE_LOG(ERROR) << "GetInternalBinding scope error";
@@ -171,9 +178,11 @@ void GetInternalBinding(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
   v8::MaybeLocal<v8::String> maybe_module_name = info[0]->ToString(context);
   if (maybe_module_name.IsEmpty()) {
+    TDF_BASE_DLOG(INFO) << "maybe_module_name is empty";
     info.GetReturnValue().SetUndefined();
     return;
   }
+  TDF_BASE_DLOG(INFO) << "maybe_module_name is not empty";
   unicode_string_view module_name = v8_ctx->ToStringView(maybe_module_name.ToLocalChecked());
   if (StringViewUtils::IsEmpty(module_name)) {
     info.GetReturnValue().SetUndefined();
