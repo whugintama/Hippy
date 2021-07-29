@@ -2614,7 +2614,7 @@ class V8_EXPORT Value : public Data {
       Local<Context> context) const;
   V8_WARN_UNUSED_RESULT MaybeLocal<Int32> ToInt32(Local<Context> context) const;
   Local<Int32> ToInt32(Isolate* isolate) const;
-  
+
   Local<Boolean> ToBoolean() const;
   Local<Boolean> ToBoolean(Isolate* isolate) const;
   V8_WARN_UNUSED_RESULT MaybeLocal<Boolean> ToBoolean(
@@ -4004,9 +4004,9 @@ class ReturnValue {
 
 /**
  * The argument information given to function call callbacks.  This
- * class provides access to information about the context of the call,
+ * class pfunctionrovides access to information about the context of the call,
  * including the receiver, the number and values of arguments, and
- * the holder of the function.
+ * the holder of the .
  */
 template<typename T>
 class FunctionCallbackInfo {
@@ -10412,7 +10412,8 @@ bool Value::QuickIsString() const {
   typedef internal::Internals I;
   A obj = *reinterpret_cast<const A*>(this);
   if (!I::HasHeapObjectTag(obj)) return false;
-  return (I::GetInstanceType(obj) < I::kFirstNonstringType);
+  auto x = I::GetInstanceType(obj);
+ return (x) < I::kFirstNonstringType;
 }
 
 
@@ -10882,7 +10883,7 @@ int64_t Isolate::AdjustAmountOfExternalAllocatedMemory(
 template<typename T, typename S>
 void Isolate::SetReference(const Persistent<T>& parent,
                            const Persistent<S>& child) {
- 
+
 }
 
 Local<Value> Context::GetEmbedderData(int index) {
