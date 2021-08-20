@@ -47,8 +47,13 @@ void JNIEnvironment::init(JavaVM* j_vm, JNIEnv* j_env) {
   wrapper_.j_inspector_channel_method_id =
       j_env->GetMethodID(j_hippy_bridge_cls, "InspectorChannel", "([B)V");
 
-  wrapper_.j_fetch_resource_method_id = j_env->GetMethodID(
+  wrapper_.j_fetch_resource_async_method_id = j_env->GetMethodID(
       j_hippy_bridge_cls, "fetchResourceWithUri", "(Ljava/lang/String;J)V");
+
+  /*
+  wrapper_.j_fetch_resource_sync_method_id = j_env->GetMethodID(
+      j_hippy_bridge_cls, "fetchResourceWithUriSync", "(Ljava/lang/String;J)[B");
+      */
   j_env->DeleteLocalRef(j_hippy_bridge_cls);
 
   if (j_env->ExceptionCheck()) {

@@ -24,33 +24,22 @@
 
 #include <android/asset_manager.h>
 
-#include <map>
-
 #include "core/core.h"
 #include "jni/scoped_java_ref.h"
 
-class ADRLoader : public hippy::base::UriLoader {
+
+class DebugDelegate : public hippy::base::UriLoader::Delegate {
  public:
   using unicode_string_view = tdf::base::unicode_string_view;
-  ADRLoader();
-  virtual ~ADRLoader() {}
+  using UriLoader = hippy::base::UriLoader;
 
-  inline void SetBridge(std::shared_ptr<JavaRef> bridge) { bridge_ = bridge; }
-  virtual unicode_string_view GetScheme(const unicode_string_view& uri);
-  virtual void GetContent(const unicode_string_view& uri,
-                          std::function<void(RetCode, bytes)> cb);
-  virtual RetCode GetContent(
-      const unicode_string_view& uri,
-      bytes& content);
+  DebugDelegate() = default;
+  virtual ~DebugDelegate() = default;
 
-  std::function<void(RetCode, bytes)> GetRequestCB(int64_t request_id);
-  int64_t SetRequestCB(std::function<void(UriLoader::RetCode, UriLoader::bytes)> cb);
-
- private:
-  bool LoadByJNI(const unicode_string_view& uri,
-                  std::function<void(RetCode, bytes)> cb);
-
-  std::shared_ptr<JavaRef> bridge_;
-  std::unordered_map<int64_t, std::function<void(UriLoader::RetCode, UriLoader::bytes)>>
-      request_map_;
+  virtual void RequestUntrustedContent(
+      UriLoader::SyncContext& ctx,
+      std::function<std::shared_ptr<Delegate>()> next);
+  virtual void RequestUntrustedContent(
+      UriLoader::ASyncContext& ctx,
+      std::function<std::shared_ptr<Delegate>()> next);
 };

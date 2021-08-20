@@ -34,7 +34,8 @@ class JNIEnvironment {
     jmethodID j_call_natives_method_id = nullptr;
     jmethodID j_report_exception_method_id = nullptr;
     jmethodID j_inspector_channel_method_id = nullptr;
-    jmethodID j_fetch_resource_method_id = nullptr;
+    jmethodID j_fetch_resource_async_method_id = nullptr;
+    jmethodID j_fetch_resource_sync_method_id = nullptr;
   };
 
  public:

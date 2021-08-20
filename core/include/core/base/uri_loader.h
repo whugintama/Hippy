@@ -22,29 +22,76 @@
 
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
+#include <list>
+#include <mutex>
 
 #include "base/unicode_string_view.h"
+
 
 namespace hippy {
 namespace base {
 
 class UriLoader {
  public:
+  enum class SourceType { Core, Java, OC};
+  enum class RetCode { Success, Failed, UriError, SchemeError, SchemeNotRegister,
+    PathError, ResourceNotFound, Timeout };
   using unicode_string_view = tdf::base::unicode_string_view;
-  using u8string = unicode_string_view::u8string;
+  using bytes = std::string;
+
+  struct SyncContext {
+    const unicode_string_view& uri;
+    RetCode ret_code;
+    bytes& content;
+  };
+
+  struct ASyncContext {
+    const unicode_string_view& uri;
+    std::function<void(RetCode, bytes)> cb;
+  };
+
+  class Delegate {
+   public:
+    Delegate() = default;
+    virtual ~Delegate() = default;
+    virtual void RequestUntrustedContent(
+        SyncContext& ctx,
+        std::function<std::shared_ptr<Delegate>()> next) = 0;
+    virtual void RequestUntrustedContent(
+        ASyncContext& ctx,
+        std::function<std::shared_ptr<Delegate>()> next) = 0;
+  };
 
   UriLoader() {}
-  virtual ~UriLoader() {}
+  ~UriLoader() {}
 
-  virtual bool RequestUntrustedContent(const unicode_string_view& uri,
-                                       std::function<void(u8string)> cb) = 0;
+  void RegisterUriDelegate(unicode_string_view scheme,
+                           std::shared_ptr<Delegate> delegate);
 
-  virtual bool RequestUntrustedContent(
+  void RequestUntrustedContent(
       const unicode_string_view& uri,
-      u8string& content) = 0;
+      std::function<void(RetCode, bytes)> cb,
+      SourceType type = SourceType::Core);
+
+  RetCode RequestUntrustedContent(
+      const unicode_string_view& uri,
+      bytes& content,
+      SourceType type = SourceType::Core);
+
+  virtual unicode_string_view GetScheme(const unicode_string_view& uri) = 0;
+  virtual void GetContent(const unicode_string_view& uri,
+                             std::function<void(RetCode, bytes)> cb) = 0;
+  virtual RetCode GetContent(
+      const unicode_string_view& uri,
+      bytes& content) = 0;
+ private:
+  std::map<std::u16string, std::list<std::shared_ptr<Delegate>>> router_;
+  std::mutex mutex_;
 };
+
 }  // namespace base
 }  // namespace hippy

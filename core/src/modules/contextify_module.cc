@@ -49,8 +49,9 @@ using CallbackInfo = hippy::napi::CallbackInfo;
 using TryCatch = hippy::napi::TryCatch;
 using UriLoader = hippy::base::UriLoader;
 using StringViewUtils = hippy::base::StringViewUtils;
+using UriLoader = hippy::base::UriLoader;
 
-void ContextifyModule::RunInThisContext(const hippy::napi::CallbackInfo& info) {
+void ContextifyModule::RunInThisContext(const hippy::napi::CallbackInfo &info) {
   std::shared_ptr<Scope> scope = info.GetScope();
   std::shared_ptr<Ctx> context = scope->GetContext();
   TDF_BASE_CHECK(context);
@@ -63,7 +64,7 @@ void ContextifyModule::RunInThisContext(const hippy::napi::CallbackInfo& info) {
   }
 
   TDF_BASE_DLOG(INFO) << "RunInThisContext key = " << key;
-  const auto& source_code =
+  const auto &source_code =
       hippy::GetNativeSourceCode(StringViewUtils::ToU8StdStr(key));
   std::shared_ptr<TryCatch> try_catch = CreateTryCatchScope(true, context);
   unicode_string_view str_view(source_code.data_, source_code.length_);
@@ -78,11 +79,11 @@ void ContextifyModule::RunInThisContext(const hippy::napi::CallbackInfo& info) {
   }
 }
 
-void ContextifyModule::RemoveCBFunc(const unicode_string_view& uri) {
+void ContextifyModule::RemoveCBFunc(const unicode_string_view &uri) {
   cb_func_map_.erase(uri);
 }
 
-void ContextifyModule::LoadUntrustedContent(const CallbackInfo& info) {
+void ContextifyModule::LoadUntrustedContent(const CallbackInfo &info) {
   std::shared_ptr<Scope> scope = info.GetScope();
   std::shared_ptr<hippy::napi::Ctx> context = scope->GetContext();
   TDF_BASE_CHECK(context);
@@ -117,8 +118,9 @@ void ContextifyModule::LoadUntrustedContent(const CallbackInfo& info) {
   std::weak_ptr<Scope> weak_scope = scope;
   std::weak_ptr<hippy::napi::CtxValue> weak_function = function;
 
-  std::function<void(u8string)> cb = [this, weak_scope, weak_function, encode,
-                                      uri](u8string code) {
+  std::function<void(UriLoader::RetCode, UriLoader::bytes)>
+      cb = [this, weak_scope, weak_function, encode,
+      uri](UriLoader::RetCode ret_code, UriLoader::bytes content) {
     std::shared_ptr<Scope> scope = weak_scope.lock();
     if (!scope) {
       return;
@@ -135,18 +137,19 @@ void ContextifyModule::LoadUntrustedContent(const CallbackInfo& info) {
       file_name = uri;
     }
 
-    if (code.empty()) {
-      TDF_BASE_DLOG(WARNING) << "Load uri = " << uri << ", code empty";
+    if (ret_code != hippy::base::UriLoader::RetCode::Success) {
+      TDF_BASE_LOG(WARNING) << "Load uri error, uri = " << uri <<
+                            ", ret_code = " << static_cast<uint32_t>(ret_code);
     } else {
-      TDF_BASE_DLOG(INFO) << "Load uri = " << uri << ", len = " << code.length()
+      TDF_BASE_DLOG(INFO) << "Load uri = " << uri << ", len = " << content.length()
                           << ", encode = " << encode
-                          << ", code = " << unicode_string_view(code);
+                          << ", content = " << unicode_string_view(content);
     }
     std::shared_ptr<JavaScriptTask> js_task =
         std::make_shared<JavaScriptTask>();
     js_task->callback = [this, weak_scope, weak_function,
-                         move_code = std::move(code), cur_dir, file_name,
-                         uri]() {
+        ret_code, code = std::move(content), cur_dir, file_name,
+        uri]() {
       std::shared_ptr<Scope> scope = weak_scope.lock();
       if (!scope) {
         return;
@@ -154,20 +157,20 @@ void ContextifyModule::LoadUntrustedContent(const CallbackInfo& info) {
 
       std::shared_ptr<Ctx> ctx = scope->GetContext();
       std::shared_ptr<CtxValue> error = nullptr;
-      if (!move_code.empty()) {
+      if (ret_code == UriLoader::RetCode::Success && !code.empty()) {
         auto last_dir_str_obj = ctx->GetGlobalStrVar("__HIPPYCURDIR__");
         TDF_BASE_DLOG(INFO) << "__HIPPYCURDIR__ cur_dir = " << cur_dir;
         ctx->SetGlobalStrVar("__HIPPYCURDIR__", cur_dir);
         std::shared_ptr<TryCatch> try_catch =
             CreateTryCatchScope(true, scope->GetContext());
         try_catch->SetVerbose(true);
-        unicode_string_view view_code(std::move(move_code));
+        unicode_string_view view_code(std::move(code));
         scope->RunJS(view_code, file_name);
         ctx->SetGlobalObjVar("__HIPPYCURDIR__", last_dir_str_obj);
         unicode_string_view view_last_dir_str;
         ctx->GetValueString(last_dir_str_obj, &view_last_dir_str);
         TDF_BASE_DLOG(INFO)
-            << "restore __HIPPYCURDIR__ = " << view_last_dir_str;
+        << "restore __HIPPYCURDIR__ = " << view_last_dir_str;
         if (try_catch->HasCaught()) {
           error = try_catch->Exception();
           TDF_BASE_DLOG(ERROR) << "RequestUntrustedContent error = "

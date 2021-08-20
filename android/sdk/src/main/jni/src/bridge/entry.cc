@@ -37,11 +37,15 @@
 #include "bridge/runtime.h"
 #include "core/base/string_view_utils.h"
 #include "core/core.h"
+#include "inspector/debug_delegate.h"
 #include "jni/exception_handler.h"
 #include "jni/jni_env.h"
 #include "jni/jni_register.h"
 #include "jni/uri.h"
 #include "loader/adr_loader.h"
+#include "loader/file_delegate.h"
+#include "loader/asset_delegate.h"
+
 
 namespace hippy {
 namespace bridge {
@@ -67,6 +71,7 @@ REGISTER_JNI("com/tencent/mtt/hippy/bridge/HippyBridgeImpl",
              "(JZLcom/tencent/mtt/hippy/bridge/NativeCallback;)V",
              DestroyInstance)
 
+
 using unicode_string_view = tdf::base::unicode_string_view;
 using u8string = unicode_string_view::u8string;
 using RegisterMap = hippy::base::RegisterMap;
@@ -74,6 +79,7 @@ using RegisterFunction = hippy::base::RegisterFunction;
 using Ctx = hippy::napi::Ctx;
 using StringViewUtils = hippy::base::StringViewUtils;
 using HippyFile = hippy::base::HippyFile;
+using UriLoader = hippy::base::UriLoader;
 #ifdef V8_HAS_INSPECTOR
 using V8InspectorClientImpl = hippy::inspector::V8InspectorClientImpl;
 std::shared_ptr<V8InspectorClientImpl> global_inspector = nullptr;
@@ -133,7 +139,7 @@ bool RunScript(std::shared_ptr<Runtime> runtime,
                       << ", uri = " << uri
                       << ", asset_manager = " << asset_manager;
   unicode_string_view script_content;
-  bool read_script_flag;
+  UriLoader::RetCode read_script_rst;
   unicode_string_view code_cache_content;
   uint64_t modify_time = 0;
 
@@ -180,29 +186,34 @@ bool RunScript(std::shared_ptr<Runtime> runtime,
     std::shared_ptr<Engine> engine = runtime->GetEngine();
     task_runner = engine->GetWorkerTaskRunner();
     task_runner->PostTask(std::move(task));
-    u8string content;
-    read_script_flag = runtime->GetScope()->GetUriLoader()
-        ->RequestUntrustedContent(uri, content);
-    if (read_script_flag) {
-      script_content = unicode_string_view(std::move(content));
+    UriLoader::bytes content;
+    read_script_rst = runtime->GetScope()->GetUriLoader()
+        ->RequestUntrustedContent(uri, content, UriLoader::SourceType::Core);
+    if (read_script_rst == UriLoader::RetCode::Success) {
+      /*
+       * 由于 char8_t 只有 c++20 才有，unicode_string_view 在 c++14 和 c++17 使用
+       * uint8_t 标识 utf8 字符，用以区分 latin 和 utf8 字符。因此此处只能多一次拷贝，以减少后续的编码转换消耗。
+       * hippy 升级 c++20 后可不必拷贝
+       */
+      script_content = unicode_string_view::new_from_utf8(content.c_str(), content.length());
     }
     code_cache_content = read_file_future.get();
   } else {
-    u8string content;
-    read_script_flag = runtime->GetScope()->GetUriLoader()
-        ->RequestUntrustedContent(uri, content);
-    if (read_script_flag) {
-      script_content = unicode_string_view(std::move(content));
+    UriLoader::bytes content;
+    read_script_rst = runtime->GetScope()->GetUriLoader()
+        ->RequestUntrustedContent(uri, content, UriLoader::SourceType::Core);
+    if (read_script_rst == UriLoader::RetCode::Success) {
+      script_content = unicode_string_view::new_from_utf8(content.c_str(), content.length());
     }
   }
 
   TDF_BASE_DLOG(INFO) << "uri = " << uri
-                      << "read_script_flag = " << read_script_flag
+                      << "read_script_rst = " << static_cast<uint32_t>(read_script_rst)
                       << ", script content = " << script_content;
 
-  if (!read_script_flag || StringViewUtils::IsEmpty(script_content)) {
-    TDF_BASE_LOG(WARNING) << "read_script_flag = " << read_script_flag
-                          << ", script content empty, uri = " << uri;
+  if (read_script_rst != UriLoader::RetCode::Success || StringViewUtils::IsEmpty(script_content)) {
+    TDF_BASE_LOG(WARNING) << "read_script_flag = " <<  static_cast<uint32_t>(read_script_rst)
+                          << ", uri = " << uri;
     return false;
   }
 
@@ -286,23 +297,27 @@ jboolean RunScriptFromUri(JNIEnv* j_env,
                       << ", code_cache_dir = " << code_cache_dir;
 
   auto runner = runtime->GetEngine()->GetJSRunner();
-  std::shared_ptr<Ctx> ctx = runtime->GetScope()->GetContext();
+  auto scope = runtime->GetScope();
+  std::shared_ptr<Ctx> ctx = scope->GetContext();
   std::shared_ptr<JavaScriptTask> task = std::make_shared<JavaScriptTask>();
   task->callback = [ctx, base_path] {
     ctx->SetGlobalStrVar("__HIPPYCURDIR__", base_path);
   };
   runner->PostTask(task);
 
-  std::shared_ptr<ADRLoader> loader = std::make_shared<ADRLoader>();
-  loader->SetBridge(runtime->GetBridge());
-  loader->SetWorkerTaskRunner(runtime->GetEngine()->GetWorkerTaskRunner());
-  runtime->GetScope()->SetUriLoader(loader);
+  std::shared_ptr<ADRLoader> loader = std::static_pointer_cast<ADRLoader>(scope->GetUriLoader());
+  std::shared_ptr<FileDelegate> file_delegate = std::make_shared<FileDelegate>();
+  file_delegate->SetWorkerTaskRunner(scope->GetWorkerTaskRunner());
+  std::shared_ptr<AssetDelegate> asset_delegate = std::make_shared<AssetDelegate>();
+  asset_delegate->SetWorkerTaskRunner(scope->GetWorkerTaskRunner());
   AAssetManager* aasset_manager = nullptr;
   if (j_aasset_manager) {
     aasset_manager = AAssetManager_fromJava(j_env, j_aasset_manager);
-    loader->SetAAssetManager(aasset_manager);
+    asset_delegate->SetAAssetManager(aasset_manager);
   }
-
+  loader->RegisterUriDelegate(u"asset", asset_delegate);
+  loader->RegisterUriDelegate(u"file", file_delegate);
+  runtime->GetScope()->SetUriLoader(loader);
   std::shared_ptr<JavaRef> save_object = std::make_shared<JavaRef>(j_env, j_cb);
   task = std::make_shared<JavaScriptTask>();
   task->callback = [runtime, save_object_ = std::move(save_object), script_name,
@@ -421,8 +436,16 @@ jlong InitInstance(JNIEnv* j_env,
       TDF_BASE_DLOG(ERROR) << "register hippyCallNatives, scope error";
       return;
     }
+    std::shared_ptr<ADRLoader> loader = std::make_shared<ADRLoader>();
+    scope->SetUriLoader(loader);
 #ifdef V8_HAS_INSPECTOR
     if (runtime->IsDebug()) {
+      std::shared_ptr<DebugDelegate> debug_delegate = std::make_shared<DebugDelegate>();
+      loader->RegisterUriDelegate(u"file", debug_delegate);
+      loader->RegisterUriDelegate(u"http", debug_delegate);
+      loader->RegisterUriDelegate(u"https", debug_delegate);
+      loader->RegisterUriDelegate(u"asset", debug_delegate);
+      loader->RegisterUriDelegate(u"debug", debug_delegate);
       if (!global_inspector) {
         global_inspector = std::make_shared<V8InspectorClientImpl>(scope);
         global_inspector->Connect(runtime->GetBridge());
