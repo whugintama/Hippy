@@ -296,7 +296,7 @@ public class HippyBridgeImpl implements HippyBridge, DevRemoteDebugProxy.OnRecei
   }
 
   @SuppressWarnings("unused")
-  public void fetchResourceWithUri(final String uri, final long resId) {
+  public void fetchResourceWithUriAsync(final String uri, final long resId) {
     UIThreadUtils.runOnUiThread(new Runnable() {
       @Override
       public void run() {
@@ -343,6 +343,15 @@ public class HippyBridgeImpl implements HippyBridge, DevRemoteDebugProxy.OnRecei
         });
       }
     });
+  }
+
+  // todo
+  @SuppressWarnings("unused")
+  public ByteBuffer fetchResourceWithUriSync(final String uri) {
+    byte[] resBytes = new byte[0];
+    final ByteBuffer buffer = ByteBuffer.allocateDirect(resBytes.length);
+    buffer.put(resBytes);
+    return buffer;
   }
 
   private HippyArray bytesToArgument(ByteBuffer buffer) {

@@ -27,19 +27,38 @@
 #include "core/core.h"
 #include "jni/scoped_java_ref.h"
 
-
 class DebugDelegate : public hippy::base::UriLoader::Delegate {
  public:
   using unicode_string_view = tdf::base::unicode_string_view;
   using UriLoader = hippy::base::UriLoader;
 
-  DebugDelegate() = default;
+  DebugDelegate(std::shared_ptr<JavaRef> bridge);
   virtual ~DebugDelegate() = default;
 
   virtual void RequestUntrustedContent(
-      UriLoader::SyncContext& ctx,
+      UriLoader::SyncContext &ctx,
       std::function<std::shared_ptr<Delegate>()> next);
   virtual void RequestUntrustedContent(
-      UriLoader::ASyncContext& ctx,
+      UriLoader::ASyncContext &ctx,
       std::function<std::shared_ptr<Delegate>()> next);
+
+  static void SetSyncDelegate(std::function<void(UriLoader::SyncContext&,
+      std::function<std::shared_ptr<Delegate>()>)> delegate) {
+    on_request_untrusted_content_sync_ = delegate;
+  }
+
+  static void SetASyncDelegate(std::function<void(UriLoader::ASyncContext&,
+      std::function<std::shared_ptr<Delegate>()>)> delegate) {
+    on_request_untrusted_content_async_ = delegate;
+  }
+
+ private:
+  static std::function<void(UriLoader::SyncContext & , std::function<std::shared_ptr<Delegate>()>)>
+      on_request_untrusted_content_sync_;
+  static std::function<void(UriLoader::ASyncContext & , std::function<std::shared_ptr<Delegate>()>)>
+      on_request_untrusted_content_async_;
+
+  void RegisterDebugDelegate();
+
+  std::shared_ptr<JavaRef> bridge_;
 };

@@ -38,8 +38,8 @@ namespace base {
 class UriLoader {
  public:
   enum class SourceType { Core, Java, OC};
-  enum class RetCode { Success, Failed, UriError, SchemeError, SchemeNotRegister,
-    PathError, ResourceNotFound, Timeout };
+  enum class RetCode { Success, Failed, DelegateError, UriError, SchemeError, SchemeNotRegister,
+    PathNotMatch, PathError, ResourceNotFound, Timeout };
   using unicode_string_view = tdf::base::unicode_string_view;
   using bytes = std::string;
 
@@ -69,25 +69,20 @@ class UriLoader {
   UriLoader() {}
   ~UriLoader() {}
 
-  void RegisterUriDelegate(unicode_string_view scheme,
-                           std::shared_ptr<Delegate> delegate);
+  virtual void RegisterUriDelegate(const unicode_string_view &scheme,
+                                   std::shared_ptr<Delegate> delegate);
+  virtual void RegisterDebugDelegate(const unicode_string_view &scheme,
+                                     std::shared_ptr<Delegate> delegate);
 
-  void RequestUntrustedContent(
+  virtual void RequestUntrustedContent(
       const unicode_string_view& uri,
-      std::function<void(RetCode, bytes)> cb,
-      SourceType type = SourceType::Core);
+      std::function<void(RetCode, bytes)> cb);
 
-  RetCode RequestUntrustedContent(
+  virtual RetCode RequestUntrustedContent(
       const unicode_string_view& uri,
-      bytes& content,
-      SourceType type = SourceType::Core);
+      bytes& content);
 
   virtual unicode_string_view GetScheme(const unicode_string_view& uri) = 0;
-  virtual void GetContent(const unicode_string_view& uri,
-                             std::function<void(RetCode, bytes)> cb) = 0;
-  virtual RetCode GetContent(
-      const unicode_string_view& uri,
-      bytes& content) = 0;
  private:
   std::map<std::u16string, std::list<std::shared_ptr<Delegate>>> router_;
   std::mutex mutex_;

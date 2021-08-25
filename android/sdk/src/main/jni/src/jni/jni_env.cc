@@ -48,12 +48,20 @@ void JNIEnvironment::init(JavaVM* j_vm, JNIEnv* j_env) {
       j_env->GetMethodID(j_hippy_bridge_cls, "InspectorChannel", "([B)V");
 
   wrapper_.j_fetch_resource_async_method_id = j_env->GetMethodID(
-      j_hippy_bridge_cls, "fetchResourceWithUri", "(Ljava/lang/String;J)V");
+      j_hippy_bridge_cls, "fetchResourceWithUriAsync", "(Ljava/lang/String;J)V");
 
-  /*
   wrapper_.j_fetch_resource_sync_method_id = j_env->GetMethodID(
-      j_hippy_bridge_cls, "fetchResourceWithUriSync", "(Ljava/lang/String;J)[B");
-      */
+      j_hippy_bridge_cls, "fetchResourceWithUriSync",
+      "(Ljava/lang/String;)Ljava/nio/ByteBuffer;");
+
+  wrapper_.j_register_uri_delegate_method_id = j_env->GetMethodID(
+      j_hippy_bridge_cls, "registerUriDelegate",
+      "(Ljava/lang/String;)Ljava/nio/ByteBuffer;");
+
+  wrapper_.j_get_next_delegate_method_id = j_env->GetMethodID(
+      j_hippy_bridge_cls, "getNextDelegate",
+      "(Ljava/lang/String;)Ljava/nio/ByteBuffer;");
+
   j_env->DeleteLocalRef(j_hippy_bridge_cls);
 
   if (j_env->ExceptionCheck()) {

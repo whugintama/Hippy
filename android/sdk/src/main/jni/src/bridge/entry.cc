@@ -37,7 +37,7 @@
 #include "bridge/runtime.h"
 #include "core/base/string_view_utils.h"
 #include "core/core.h"
-#include "inspector/debug_delegate.h"
+#include "loader/debug_delegate.h"
 #include "jni/exception_handler.h"
 #include "jni/jni_env.h"
 #include "jni/jni_register.h"
@@ -188,7 +188,7 @@ bool RunScript(std::shared_ptr<Runtime> runtime,
     task_runner->PostTask(std::move(task));
     UriLoader::bytes content;
     read_script_rst = runtime->GetScope()->GetUriLoader()
-        ->RequestUntrustedContent(uri, content, UriLoader::SourceType::Core);
+        ->RequestUntrustedContent(uri, content);
     if (read_script_rst == UriLoader::RetCode::Success) {
       /*
        * 由于 char8_t 只有 c++20 才有，unicode_string_view 在 c++14 和 c++17 使用
@@ -201,7 +201,7 @@ bool RunScript(std::shared_ptr<Runtime> runtime,
   } else {
     UriLoader::bytes content;
     read_script_rst = runtime->GetScope()->GetUriLoader()
-        ->RequestUntrustedContent(uri, content, UriLoader::SourceType::Core);
+        ->RequestUntrustedContent(uri, content);
     if (read_script_rst == UriLoader::RetCode::Success) {
       script_content = unicode_string_view::new_from_utf8(content.c_str(), content.length());
     }
@@ -440,12 +440,11 @@ jlong InitInstance(JNIEnv* j_env,
     scope->SetUriLoader(loader);
 #ifdef V8_HAS_INSPECTOR
     if (runtime->IsDebug()) {
-      std::shared_ptr<DebugDelegate> debug_delegate = std::make_shared<DebugDelegate>();
-      loader->RegisterUriDelegate(u"file", debug_delegate);
-      loader->RegisterUriDelegate(u"http", debug_delegate);
-      loader->RegisterUriDelegate(u"https", debug_delegate);
-      loader->RegisterUriDelegate(u"asset", debug_delegate);
-      loader->RegisterUriDelegate(u"debug", debug_delegate);
+      std::shared_ptr<DebugDelegate> debug_delegate =
+          std::make_shared<DebugDelegate>(runtime->GetBridge());
+      loader->RegisterDebugDelegate(u"http", debug_delegate);
+      loader->RegisterDebugDelegate(u"https", debug_delegate);
+      loader->RegisterDebugDelegate(u"debug", debug_delegate);
       if (!global_inspector) {
         global_inspector = std::make_shared<V8InspectorClientImpl>(scope);
         global_inspector->Connect(runtime->GetBridge());

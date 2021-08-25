@@ -36,6 +36,9 @@ class JNIEnvironment {
     jmethodID j_inspector_channel_method_id = nullptr;
     jmethodID j_fetch_resource_async_method_id = nullptr;
     jmethodID j_fetch_resource_sync_method_id = nullptr;
+    jmethodID j_register_uri_delegate_method_id = nullptr;
+    jmethodID j_register_debug_delegate_method_id = nullptr;
+    jmethodID j_get_next_delegate_method_id = nullptr;
   };
 
  public:
