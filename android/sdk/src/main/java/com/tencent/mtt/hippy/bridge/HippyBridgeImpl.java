@@ -271,7 +271,11 @@ public class HippyBridgeImpl implements HippyBridge, DevRemoteDebugProxy.OnRecei
   public native void callFunction(String action, long V8RuntimId, NativeCallback callback,
       byte[] buffer, int offset, int length);
 
-  public native void onResourceReady(ByteBuffer output, long runtimeId, long resId);
+  public native void onResourceReady(HippyUriResource output, long runtimeId, long resId);
+
+  public native HippyUriResource getUriContentSync(String uri, long runtimeId);
+
+  public native void onGetUriContentASync(String uri, long runtimeId, NativeCallback callback);
 
   public void callNatives(String moduleName, String moduleFunc, String callId, byte[] buffer) {
     callNatives(moduleName, moduleFunc, callId, ByteBuffer.wrap(buffer));
@@ -295,8 +299,12 @@ public class HippyBridgeImpl implements HippyBridge, DevRemoteDebugProxy.OnRecei
     }
   }
 
+  public HippyUriResource fetchResourceWithUriSync(final String uri, boolean fromCore) {
+    return new HippyUriResource();
+  }
+
   @SuppressWarnings("unused")
-  public void fetchResourceWithUriAsync(final String uri, final long resId) {
+  public void fetchResourceWithUriAsync(final String uri, final long resId, boolean fromCore) {
     UIThreadUtils.runOnUiThread(new Runnable() {
       @Override
       public void run() {
@@ -326,7 +334,10 @@ public class HippyBridgeImpl implements HippyBridge, DevRemoteDebugProxy.OnRecei
               byte[] resBytes = output.toByteArray();
               final ByteBuffer buffer = ByteBuffer.allocateDirect(resBytes.length);
               buffer.put(resBytes);
-              onResourceReady(buffer, mV8RuntimeId, resId);
+              HippyUriResource uri = new HippyUriResource();
+              uri.code = HippyUriResource.RetCode.Success;
+              uri.content = buffer;
+              onResourceReady(uri, mV8RuntimeId, resId);
             } catch (Throwable e) {
               if (mBridgeCallback != null) {
                 mBridgeCallback.reportException(e);
@@ -343,15 +354,6 @@ public class HippyBridgeImpl implements HippyBridge, DevRemoteDebugProxy.OnRecei
         });
       }
     });
-  }
-
-  // todo
-  @SuppressWarnings("unused")
-  public ByteBuffer fetchResourceWithUriSync(final String uri) {
-    byte[] resBytes = new byte[0];
-    final ByteBuffer buffer = ByteBuffer.allocateDirect(resBytes.length);
-    buffer.put(resBytes);
-    return buffer;
   }
 
   private HippyArray bytesToArgument(ByteBuffer buffer) {

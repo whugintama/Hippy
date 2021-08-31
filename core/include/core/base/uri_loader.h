@@ -37,7 +37,7 @@ namespace base {
 
 class UriLoader {
  public:
-  enum class SourceType { Core, Java, OC};
+  enum class SrcType { Core, NotCore};
   enum class RetCode { Success, Failed, DelegateError, UriError, SchemeError, SchemeNotRegister,
     PathNotMatch, PathError, ResourceNotFound, Timeout };
   using unicode_string_view = tdf::base::unicode_string_view;
@@ -47,27 +47,43 @@ class UriLoader {
     const unicode_string_view& uri;
     RetCode ret_code;
     bytes& content;
+    SrcType src_type;
   };
 
   struct ASyncContext {
     const unicode_string_view& uri;
     std::function<void(RetCode, bytes)> cb;
+    SrcType src_type;
   };
 
   class Delegate {
    public:
     Delegate() = default;
     virtual ~Delegate() = default;
+
     virtual void RequestUntrustedContent(
         SyncContext& ctx,
-        std::function<std::shared_ptr<Delegate>()> next) = 0;
+        std::function<std::shared_ptr<Delegate>()> next);
     virtual void RequestUntrustedContent(
         ASyncContext& ctx,
-        std::function<std::shared_ptr<Delegate>()> next) = 0;
+        std::function<std::shared_ptr<Delegate>()> next);
+    std::function<void(UriLoader::SyncContext&)> GetNext(
+        SyncContext& ctx,
+        std::function<std::shared_ptr<Delegate>()> next);
+    std::function<void(UriLoader::ASyncContext&)> GetNext(
+        ASyncContext& ctx,
+        std::function<std::shared_ptr<Delegate>()> next);
+
+    virtual void RequestUntrustedContent(
+        SyncContext& ctx,
+        std::function<void(SyncContext&)> next) = 0;
+    virtual void RequestUntrustedContent(
+        ASyncContext& ctx,
+        std::function<void(ASyncContext&)> next) = 0;
   };
 
   UriLoader() {}
-  ~UriLoader() {}
+  virtual ~UriLoader() {}
 
   virtual void RegisterUriDelegate(const unicode_string_view &scheme,
                                    std::shared_ptr<Delegate> delegate);
@@ -76,11 +92,13 @@ class UriLoader {
 
   virtual void RequestUntrustedContent(
       const unicode_string_view& uri,
-      std::function<void(RetCode, bytes)> cb);
+      std::function<void(RetCode, bytes)> cb,
+      SrcType src_type = SrcType::Core);
 
   virtual RetCode RequestUntrustedContent(
       const unicode_string_view& uri,
-      bytes& content);
+      bytes& content,
+      SrcType src_type = SrcType::Core);
 
   virtual unicode_string_view GetScheme(const unicode_string_view& uri) = 0;
  private:

@@ -29,7 +29,7 @@
 std::shared_ptr<JNIEnvironment> JNIEnvironment::instance_ = nullptr;
 std::mutex JNIEnvironment::mutex_;
 
-void JNIEnvironment::init(JavaVM* j_vm, JNIEnv* j_env) {
+void JNIEnvironment::Init(JavaVM* j_vm, JNIEnv* j_env) {
   j_vm_ = j_vm;
 
   jclass j_hippy_bridge_cls =
@@ -48,19 +48,20 @@ void JNIEnvironment::init(JavaVM* j_vm, JNIEnv* j_env) {
       j_env->GetMethodID(j_hippy_bridge_cls, "InspectorChannel", "([B)V");
 
   wrapper_.j_fetch_resource_async_method_id = j_env->GetMethodID(
-      j_hippy_bridge_cls, "fetchResourceWithUriAsync", "(Ljava/lang/String;J)V");
+      j_hippy_bridge_cls, "fetchResourceWithUriAsync", "(Ljava/lang/String;JZ)V");
 
   wrapper_.j_fetch_resource_sync_method_id = j_env->GetMethodID(
       j_hippy_bridge_cls, "fetchResourceWithUriSync",
-      "(Ljava/lang/String;)Ljava/nio/ByteBuffer;");
+      "(Ljava/lang/String;Z)Lcom/tencent/mtt/hippy/bridge/HippyUriResource;");
+  /*
+  wrapper_.j_get_next_sync_method_id = j_env->GetMethodID(
+      j_hippy_bridge_cls, "getNextSync",
+      "(Ljava/lang/String;)Lcom/tencent/mtt/hippy/bridge/HippyUriResource;");
 
-  wrapper_.j_register_uri_delegate_method_id = j_env->GetMethodID(
-      j_hippy_bridge_cls, "registerUriDelegate",
-      "(Ljava/lang/String;)Ljava/nio/ByteBuffer;");
-
-  wrapper_.j_get_next_delegate_method_id = j_env->GetMethodID(
-      j_hippy_bridge_cls, "getNextDelegate",
-      "(Ljava/lang/String;)Ljava/nio/ByteBuffer;");
+  wrapper_.j_get_next_async_method_id = j_env->GetMethodID(
+      j_hippy_bridge_cls, "getNextASync",
+      "(Ljava/lang/String;J)V");
+      */
 
   j_env->DeleteLocalRef(j_hippy_bridge_cls);
 

@@ -36,9 +36,8 @@ class JNIEnvironment {
     jmethodID j_inspector_channel_method_id = nullptr;
     jmethodID j_fetch_resource_async_method_id = nullptr;
     jmethodID j_fetch_resource_sync_method_id = nullptr;
-    jmethodID j_register_uri_delegate_method_id = nullptr;
-    jmethodID j_register_debug_delegate_method_id = nullptr;
-    jmethodID j_get_next_delegate_method_id = nullptr;
+    jmethodID j_get_next_sync_method_id = nullptr;
+    jmethodID j_get_next_async_method_id = nullptr;
   };
 
  public:
@@ -50,7 +49,7 @@ class JNIEnvironment {
   ~JNIEnvironment() = default;
 
   inline JNIWrapper GetMethods() { return wrapper_; }
-  void init(JavaVM* vm, JNIEnv* env);
+  void Init(JavaVM* j_vm, JNIEnv* j_env);
   JNIEnv* AttachCurrentThread();
   void DetachCurrentThread();
 

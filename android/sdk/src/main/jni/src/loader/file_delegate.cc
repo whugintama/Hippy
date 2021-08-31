@@ -6,7 +6,7 @@ using HippyFile = hippy::base::HippyFile;
 
 void FileDelegate::RequestUntrustedContent(
     UriLoader::SyncContext& ctx,
-    std::function<std::shared_ptr<Delegate>()> next) {
+    std::function<void(UriLoader::SyncContext&)> next) {
   unicode_string_view uri = ctx.uri;
   std::shared_ptr<Uri> uri_obj = Uri::Create(uri);
   unicode_string_view path = uri_obj->GetPath();
@@ -24,7 +24,7 @@ void FileDelegate::RequestUntrustedContent(
 
 void FileDelegate::RequestUntrustedContent(
     UriLoader::ASyncContext& ctx,
-    std::function<std::shared_ptr<Delegate>()> next) {
+    std::function<void(UriLoader::ASyncContext&)> next) {
   unicode_string_view uri = ctx.uri;
   std::shared_ptr<Uri> uri_obj = Uri::Create(uri);
   unicode_string_view path = uri_obj->GetPath();

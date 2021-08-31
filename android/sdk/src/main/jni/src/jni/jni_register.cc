@@ -52,7 +52,7 @@ bool JNIRegister::RegisterMethods(JNIEnv* j_env) {
       TDF_BASE_DLOG(ERROR)
           << "NativeAccess class "
           << class_name
-          << "not found";
+          << " not found";
       return false;
     }
     std::vector<JNIRegisterData> datas = it->second;

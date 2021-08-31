@@ -45,10 +45,10 @@ class AssetDelegate : public hippy::base::UriLoader::Delegate {
 
   virtual void RequestUntrustedContent(
       UriLoader::SyncContext& ctx,
-      std::function<std::shared_ptr<Delegate>()> next);
+      std::function<void(UriLoader::SyncContext&)> next);
   virtual void RequestUntrustedContent(
       UriLoader::ASyncContext& ctx,
-      std::function<std::shared_ptr<Delegate>()> next);
+      std::function<void(UriLoader::ASyncContext&)> next);
  private:
   bool LoadByAsset(const unicode_string_view& file_path,
                    std::function<void(UriLoader::RetCode, UriLoader::bytes)> cb,

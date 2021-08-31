@@ -45,33 +45,30 @@ std::shared_ptr<Uri> Uri::Create(const unicode_string_view& uri) {
   return ret;
 }
 
-bool Uri::Init() {
-  JNIEnv* env = JNIEnvironment::GetInstance()->AttachCurrentThread();
-  jclass j_local_clazz = env->FindClass("java/net/URI");
-  j_clazz = (jclass)env->NewGlobalRef(j_local_clazz);
-  j_create_method_id = env->GetStaticMethodID(
+bool Uri::Init(JNIEnv* j_env) {
+  jclass j_local_clazz = j_env->FindClass("java/net/URI");
+  j_clazz = (jclass)j_env->NewGlobalRef(j_local_clazz);
+  j_create_method_id = j_env->GetStaticMethodID(
       j_clazz, "create", "(Ljava/lang/String;)Ljava/net/URI;");
   j_normalize_method_id =
-      env->GetMethodID(j_clazz, "normalize", "()Ljava/net/URI;");
+      j_env->GetMethodID(j_clazz, "normalize", "()Ljava/net/URI;");
   j_to_string_method_id =
-      env->GetMethodID(j_clazz, "toString", "()Ljava/lang/String;");
+      j_env->GetMethodID(j_clazz, "toString", "()Ljava/lang/String;");
   j_get_scheme_method_id =
-      env->GetMethodID(j_clazz, "getScheme", "()Ljava/lang/String;");
+      j_env->GetMethodID(j_clazz, "getScheme", "()Ljava/lang/String;");
   j_get_path_method_id =
-      env->GetMethodID(j_clazz, "getPath", "()Ljava/lang/String;");
+      j_env->GetMethodID(j_clazz, "getPath", "()Ljava/lang/String;");
   return true;
 }
 
-bool Uri::Destory() {
-  JNIEnv* env = JNIEnvironment::GetInstance()->AttachCurrentThread();
-
+bool Uri::Destroy(JNIEnv* j_env) {
   j_get_path_method_id = nullptr;
   j_get_scheme_method_id = nullptr;
   j_to_string_method_id = nullptr;
   j_normalize_method_id = nullptr;
   j_create_method_id = nullptr;
 
-  env->DeleteGlobalRef(j_clazz);
+  j_env->DeleteGlobalRef(j_clazz);
 
   return true;
 }

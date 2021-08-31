@@ -48,7 +48,7 @@ bool ReadAsset(const tdf::base::unicode_string_view& path,
 
 void AssetDelegate::RequestUntrustedContent(
     UriLoader::SyncContext& ctx,
-    std::function<std::shared_ptr<Delegate>()> next) {
+    std::function<void(UriLoader::SyncContext&)> next) {
   unicode_string_view uri = ctx.uri;
   std::shared_ptr<Uri> uri_obj = Uri::Create(uri);
   unicode_string_view path = uri_obj->GetPath();
@@ -66,7 +66,7 @@ void AssetDelegate::RequestUntrustedContent(
 
 void AssetDelegate::RequestUntrustedContent(
     UriLoader::ASyncContext& ctx,
-    std::function<std::shared_ptr<Delegate>()> next) {
+    std::function<void(UriLoader::ASyncContext&)> next) {
   unicode_string_view uri = ctx.uri;
   std::shared_ptr<Uri> uri_obj = Uri::Create(uri);
   unicode_string_view path = uri_obj->GetPath();

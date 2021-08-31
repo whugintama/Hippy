@@ -38,8 +38,8 @@ class Uri {
   unicode_string_view GetPath();
   unicode_string_view GetScheme();
   unicode_string_view Normalize();
-  static bool Init();
-  static bool Destory();
+  static bool Init(JNIEnv* j_env);
+  static bool Destroy(JNIEnv* j_env);
 
  private:
   jobject j_obj_uri_;

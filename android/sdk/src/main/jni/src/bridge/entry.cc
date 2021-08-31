@@ -37,14 +37,15 @@
 #include "bridge/runtime.h"
 #include "core/base/string_view_utils.h"
 #include "core/core.h"
-#include "loader/debug_delegate.h"
 #include "jni/exception_handler.h"
 #include "jni/jni_env.h"
 #include "jni/jni_register.h"
 #include "jni/uri.h"
 #include "loader/adr_loader.h"
-#include "loader/file_delegate.h"
 #include "loader/asset_delegate.h"
+#include "loader/debug_delegate.h"
+#include "loader/file_delegate.h"
+#include "loader/jni_delegate.h"
 
 
 namespace hippy {
@@ -610,9 +611,9 @@ jint JNI_OnLoad(JavaVM* j_vm, void* reserved) {
     return onLoad_err;
   }
 
-  JNIEnvironment::GetInstance()->init(j_vm, j_env);
-
-  Uri::Init();
+  JNIEnvironment::GetInstance()->Init(j_vm, j_env);
+  Uri::Init(j_env);
+  JniDelegate::Init(j_env);
 
   return JNI_VERSION_1_4;
 }
@@ -620,7 +621,9 @@ jint JNI_OnLoad(JavaVM* j_vm, void* reserved) {
 void JNI_OnUnload(JavaVM* j_vm, void* reserved) {
   hippy::napi::V8VM::PlatformDestroy();
 
-  Uri::Destory();
+  JNIEnv* j_env = JNIEnvironment::GetInstance()->AttachCurrentThread();
+  Uri::Destroy(j_env);
+  JniDelegate::Destroy(j_env);
 
   JNIEnvironment::DestroyInstance();
 }

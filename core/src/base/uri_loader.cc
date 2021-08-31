@@ -28,6 +28,44 @@
 namespace hippy {
 namespace base {
 
+using Delegate = UriLoader::Delegate;
+
+void Delegate::RequestUntrustedContent(
+    SyncContext& ctx,
+    std::function<std::shared_ptr<Delegate>()> next) {
+  RequestUntrustedContent(ctx, GetNext(ctx, next));
+}
+
+void Delegate::RequestUntrustedContent(
+    ASyncContext& ctx,
+    std::function<std::shared_ptr<Delegate>()> next) {
+  RequestUntrustedContent(ctx, GetNext(ctx, next));
+}
+
+std::function<void(UriLoader::SyncContext&)> Delegate::GetNext(
+    SyncContext& ctx,
+    std::function<std::shared_ptr<Delegate>()> next) {
+  return [next](UriLoader::SyncContext& ctx) {
+    auto next_delegate = next();
+    if (!next_delegate) {
+      return;
+    }
+    next_delegate->RequestUntrustedContent(ctx, next);
+  };
+}
+
+std::function<void(UriLoader::ASyncContext&)> Delegate::GetNext(
+    ASyncContext& ctx,
+    std::function<std::shared_ptr<Delegate>()> next) {
+  return [next](UriLoader::ASyncContext& ctx) {
+    auto next_delegate = next();
+    if (!next_delegate) {
+      return;
+    }
+    next_delegate->RequestUntrustedContent(ctx, next);
+  };
+}
+
 void UriLoader::RegisterUriDelegate(const unicode_string_view& scheme,
                                     std::shared_ptr<Delegate> delegate) {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -59,7 +97,8 @@ void UriLoader::RegisterDebugDelegate(const unicode_string_view& scheme,
 }
 
 UriLoader::RetCode UriLoader::RequestUntrustedContent(const unicode_string_view &uri,
-                                                      bytes &content) {
+                                                      bytes &content,
+                                                      SrcType src_type) {
   unicode_string_view scheme = GetScheme(uri);
   if (scheme.encoding() == unicode_string_view::Encoding::Unkown) {
     return RetCode::SchemeError;
@@ -72,9 +111,10 @@ UriLoader::RetCode UriLoader::RequestUntrustedContent(const unicode_string_view 
   if (scheme_it == router_.end()) {
     return RetCode::SchemeNotRegister;
   }
-  SyncContext ctx{uri, RetCode::Success, content};
+  SyncContext ctx{uri, RetCode::Success, content, src_type};
   auto cur_it = scheme_it->second.begin();
   auto end_it = scheme_it->second.end();
+
   std::function<std::shared_ptr<Delegate>()> next =
       [&cur_it, end_it]() -> std::shared_ptr<Delegate> {
         ++cur_it;
@@ -88,7 +128,8 @@ UriLoader::RetCode UriLoader::RequestUntrustedContent(const unicode_string_view 
 }
 
 void UriLoader::RequestUntrustedContent(const unicode_string_view &uri,
-                                        std::function<void(RetCode, bytes)> cb) {
+                                        std::function<void(RetCode, bytes)> cb,
+                                        SrcType src_type) {
   bytes content;
   unicode_string_view scheme = GetScheme(uri);
   if (scheme.encoding() == unicode_string_view::Encoding::Unkown) {

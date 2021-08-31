@@ -31,7 +31,9 @@ const uint32_t WorkerTaskRunner::kLowPriorityTaskPriority = 15000;
 
 WorkerTaskRunner::WorkerTaskRunner(uint32_t pool_size) : pool_size_(pool_size) {
   for (uint32_t i = 0; i < pool_size_; ++i) {
-    thread_pool_.push_back(std::make_unique<WorkerThread>(this));
+    auto workerThread = std::make_unique<WorkerThread>(this);
+    workerThread->Start();
+    thread_pool_.push_back(std::move(workerThread));
   }
 }
 
@@ -82,7 +84,6 @@ void WorkerTaskRunner::Terminate() {
 WorkerTaskRunner::WorkerThread::WorkerThread(WorkerTaskRunner* runner)
     : Thread(Options("Hippy WorkerTaskRunner WorkerThread")), runner_(runner) {
   TDF_BASE_DLOG(INFO) << "WorkerThread create";
-  Start();
 }
 
 WorkerTaskRunner::WorkerThread::~WorkerThread() {
