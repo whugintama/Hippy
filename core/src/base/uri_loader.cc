@@ -145,7 +145,7 @@ void UriLoader::RequestUntrustedContent(const unicode_string_view &uri,
     cb(RetCode::SchemeNotRegister, content);
     return;
   }
-  ASyncContext ctx{uri, cb};
+  ASyncContext ctx{uri, cb, src_type};
   auto cur_it = scheme_it->second.begin();
   auto end_it = scheme_it->second.end();
   std::function<std::shared_ptr<Delegate>()> next =

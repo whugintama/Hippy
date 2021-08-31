@@ -53,15 +53,14 @@ void JNIEnvironment::Init(JavaVM* j_vm, JNIEnv* j_env) {
   wrapper_.j_fetch_resource_sync_method_id = j_env->GetMethodID(
       j_hippy_bridge_cls, "fetchResourceWithUriSync",
       "(Ljava/lang/String;Z)Lcom/tencent/mtt/hippy/bridge/HippyUriResource;");
-  /*
+
   wrapper_.j_get_next_sync_method_id = j_env->GetMethodID(
       j_hippy_bridge_cls, "getNextSync",
       "(Ljava/lang/String;)Lcom/tencent/mtt/hippy/bridge/HippyUriResource;");
 
   wrapper_.j_get_next_async_method_id = j_env->GetMethodID(
-      j_hippy_bridge_cls, "getNextASync",
+      j_hippy_bridge_cls, "getNextAsync",
       "(Ljava/lang/String;J)V");
-      */
 
   j_env->DeleteLocalRef(j_hippy_bridge_cls);
 

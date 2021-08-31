@@ -13,8 +13,7 @@ static std::atomic<int64_t> global_request_id{0};
 std::unordered_map<int64_t, std::function<void(UriLoader::RetCode, UriLoader::bytes)>>
     JniDelegate::request_map_ =
     std::unordered_map < int64_t, std::function<void(UriLoader::RetCode, UriLoader::bytes)>>
-{
-};
+{};
 JniDelegate::JniUriResourceWrapper JniDelegate::wrapper_ = {};
 
 UriLoader::RetCode JniDelegate::JavaEnumToCEnum(jobject j_ret_code) {
@@ -316,7 +315,7 @@ jobject GetUriContentSync(JNIEnv *j_env,
   }
   UriLoader::bytes content;
   UriLoader::RetCode ret_code = loader->RequestUntrustedContent(
-      JniUtils::ToStrView(j_env, j_uri), content, );
+      JniUtils::ToStrView(j_env, j_uri), content, UriLoader::SrcType::NotCore);
   return JniDelegate::CreateUriResource(j_env, ret_code, content);
 }
 
@@ -339,7 +338,7 @@ REGISTER_JNI("com/tencent/mtt/hippy/bridge/HippyBridgeImpl",
 "(Ljava/lang/String;J)Lcom/tencent/mtt/hippy/bridge/HippyUriResource;",
 GetUriContentSync)
 
-void OnGetUriContentASync(JNIEnv *j_env,
+void GetUriContentASync(JNIEnv *j_env,
                           jobject j_object,
                           jstring j_uri,
                           jlong j_runtime_id,
@@ -387,13 +386,14 @@ void OnGetUriContentASync(JNIEnv *j_env,
       j_env->DeleteLocalRef(j_class);
     }
   };
-  loader->RequestUntrustedContent(JniUtils::ToStrView(j_env, j_uri), cb);
+  loader->RequestUntrustedContent(JniUtils::ToStrView(j_env, j_uri), cb,
+                                  UriLoader::SrcType::NotCore);
 }
 
 REGISTER_JNI("com/tencent/mtt/hippy/bridge/HippyBridgeImpl",
-"onGetUriContentASync",
+"getUriContentASync",
 "(Ljava/lang/String;JLcom/tencent/mtt/hippy/bridge/NativeCallback;)V",
-OnGetUriContentASync)
+GetUriContentASync)
 
 std::function<void(UriLoader::RetCode,
                    UriLoader::bytes)> JniDelegate::GetRequestCB(int64_t request_id) {

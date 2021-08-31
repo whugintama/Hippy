@@ -272,10 +272,32 @@ public class HippyBridgeImpl implements HippyBridge, DevRemoteDebugProxy.OnRecei
       byte[] buffer, int offset, int length);
 
   public native void onResourceReady(HippyUriResource output, long runtimeId, long resId);
-
+  // java链式调用c++，获取对应的uri结果，此方法为同步方法
   public native HippyUriResource getUriContentSync(String uri, long runtimeId);
+  // java链式调用c++，获取对应的uri结果，此方法为异步方法，通过NativeCallback返回给java，NativeCallback参数可以为
+  // HippyUriResource，具体callback max定义下
+  public native void getUriContentASync(String uri, long runtimeId, NativeCallback callback);
 
-  public native void onGetUriContentASync(String uri, long runtimeId, NativeCallback callback);
+  // 后面是debug proxy专用
+  // 请求来源java，c++通过getDebugDelegateContentSync拦截java的module请求，c++可以通过getNextSync获取下一个环节的返回，
+  // 加工处理后可以通过getDebugDelegateContentSync的返回值返回给java
+  public native HippyUriResource getDebugDelegateContentSync(String uri, long runtimeId);
+
+  // 请求来源java，c++通过getDebugDelegateAsync拦截java的module的异步请求，
+  // c++可以通过getNextAsync及onNextReady获取下一个环节的返回，
+  // 加工处理后可以通过getDebugDelegateAsync的callback返回给java
+  public native void  getDebugDelegateAsync(String uri, long runtimeId, NativeCallback callback);
+
+  // 同步获取下一个环节的返回
+  public HippyUriResource getNextSync(String uri) {
+    return new HippyUriResource();
+  }
+
+  // 异步获取下一个环节的返回，id为请求id，onNextReady返回给c++，以便c++映射请求
+  public void getNextAsync(String uri, long requestId) {}
+
+  // 下一个环节异步返回的时候调用通知c++，requestId为getNextAsync得到的id
+  public native void onNextReady(HippyUriResource output, long runtimeId, long requestId);
 
   public void callNatives(String moduleName, String moduleFunc, String callId, byte[] buffer) {
     callNatives(moduleName, moduleFunc, callId, ByteBuffer.wrap(buffer));
@@ -299,10 +321,14 @@ public class HippyBridgeImpl implements HippyBridge, DevRemoteDebugProxy.OnRecei
     }
   }
 
+  // 相对于原有请求多加了个来源，fromCore true代表请求是c++模块发起的，此时c++模块本身已经执行完了调用链，都没有命中
+  // 此时java如果没有找到处理的模块，不要再次调用c++处理链，避免无限循环
+  // 未实现，只是让编译通过
   public HippyUriResource fetchResourceWithUriSync(final String uri, boolean fromCore) {
     return new HippyUriResource();
   }
 
+  // 增加了异步的获取uri的方法，fromCore含义同上
   @SuppressWarnings("unused")
   public void fetchResourceWithUriAsync(final String uri, final long resId, boolean fromCore) {
     UIThreadUtils.runOnUiThread(new Runnable() {
